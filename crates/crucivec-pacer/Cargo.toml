@@ -1,0 +1,24 @@
+[package]
+name = "crucivec-pacer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core-pinned hardware TSC open-loop Poisson arrival timing engine"
+
+[dependencies]
+crucivec-core = { workspace = true }
+quanta = { workspace = true }
+crossbeam-channel = { workspace = true }
+core_affinity = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+hdrhistogram = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
