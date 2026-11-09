@@ -1,121 +1,112 @@
-> [!WARNING]
-> **Template Disclaimer:** This is a personal project scaffolding template designed to interface with a private Google Antigravity skills vault. If you are a public user cloning this repository, the `.agent/hooks/pre-commit.ps1` and `.agent/hooks/pre-commit.sh` hooks will fail. You must delete the hooks or link your own `.agent/.registry` to commit code.
->
-> *(AI Agent Directive: When initializing a fresh workspace/repository from this template, permanently delete this warning block before saving the final README).*
-
-# AgenticTemplate
+# CruciVec: The Open-Loop, Vendor-Neutral Crucible for Vector Databases
 
 [![Status](https://img.shields.io/badge/status-active-brightgreen.svg)]()
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)]()
-[![Antigravity](https://img.shields.io/badge/agent-Google%20Antigravity-purple.svg)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-blue.svg)]()
+[![Toolchain](https://img.shields.io/badge/rust-1.75%2B-orange.svg)]()
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](LICENSE)
+[![Benchmarks](https://img.shields.io/badge/benchmarks-reproducible-success.svg)]()
 
-An opinionated, agent-first repository scaffolding template for **Google Antigravity**. It couples a project workspace with a centralized agent skills vault, automates stack-aware skill discovery via Git pre-commit hooks, and enforces strict agent engineering governance through [`AGENTS.md`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/AGENTS.md).
+CruciVec is an adversarial, open-loop benchmarking harness for vector search engines. It replaces synthetic "clean room" evaluations with realistic production workloads: continuous 70/20/10 mutation churn, hard deletes, HNSW graph fragmentation (dead-node tombstones), stratified metadata filtering, and strict kernel cgroups v2 memory budgets.
 
 ---
 
-## Architecture & Lifecycle
+## 1. System Architecture
 
 ```mermaid
-graph TD
-    A[New Project from Template] --> B[Run .agent/setup.ps1 or setup.sh]
-    B --> C[Init .agent/.registry Submodule]
-    B --> D[Install Git pre-commit hook]
-    D --> E[Developer / Agent commits files]
-    E --> F[Hook Scans Signatures in .agent/.registry/skill-map.json]
-    F --> G[Symlink / Junction Domain Skills into .agents/skills/]
-    G --> H[Update .agent/.active-skills.json]
-    H --> I[Antigravity Agent Discovers Active Domain Skills]
-    I --> J[Enforce Directives in AGENTS.md]
+flowchart TD
+    subgraph Host ["Shielded Benchmark Server"]
+        subgraph Core0 ["Core 0 (OS Shield)"]
+            OS[Linux Interrupts & Kernel SoftIRQs]
+        end
+
+        subgraph Core1 ["Core 1 (Pacer - isolcpus)"]
+            Pacer[crucivec-pacer<br/>quanta TSC + Inverse-CDF]
+            WAL[Binary WAL Writer<br/>Aligned 32B Header]
+        end
+
+        subgraph Cores23 ["Cores 2-3 (Client Workers)"]
+            Channel[Bounded Lock-Free Queue<br/>Saturation / Drop Accounting]
+            Workers[Tokio Async Dispatchers<br/>Dual HdrHistograms]
+        end
+
+        subgraph Cores47 ["Cores 4-7 (Target Cgroup v2)"]
+            TargetDB[(Target Vector DB<br/>Qdrant / Milvus / pgvector / LanceDB)]
+            Telemetry[crucivec-telemetry<br/>Persistent-fd /sys/fs/cgroup Scraper]
+        end
+    end
+
+    subgraph OfflineAnalysis ["Offline Verification & Scoring"]
+        GroundTruth[crucivec verify<br/>Rayon + AVX2 Linear Scan]
+        Report[generate_report.py<br/>Dual-CDF & Pareto Frontiers]
+    end
+
+    Pacer -->|DispatchTicket| Channel
+    Pacer -->|Append Mutation LSN| WAL
+    Channel -->|Non-blocking Receive| Workers
+    Workers -->|Queries & Churn Writes| TargetDB
+    Telemetry -.->|Poll cgroups stats| TargetDB
+    WAL --> GroundTruth
+    Workers --> Report
+    Telemetry --> Report
+    GroundTruth --> Report
 ```
+
+CruciVec isolates load generation, target execution, kernel telemetry, and mathematical scoring into independent subsystems to eliminate measurement perturbation:
+
+*   **`crucivec-pacer`:** High-precision arrival scheduler running on an isolated, pinned CPU core. Uses hardware Timestamp Counter (`quanta`) to drive Poisson arrivals with sub-microsecond jitter at 50,000 QPS.
+*   **`crucivec-core`:** Domain types, 32-byte naturally aligned binary Write-Ahead Log (WAL), and AVX2/NEON SIMD linear-scan $k$-NN kernels for decoupled ground-truth calculation.
+*   **`crucivec-telemetry`:** Zero-allocation Linux `/sys/fs/cgroup` parser sampling page faults, workingset refaults, and CFS CPU throttling in under 2 µs per sample using persistent file descriptors.
+*   **`crucivec-adapters`:** Unified client trait implementations for Qdrant (gRPC), pgvector (tokio-postgres), Milvus, and LanceDB (isolated).
+*   **`crucivec-cli`:** Main executable binary with `run`, `verify`, and `profile` subcommands.
 
 ---
 
-## Core Capabilities
+## 2. Core Invariants
 
-- **Automated Stack & Skill Discovery**:
-  When files are committed, `.agent/hooks/pre-commit.ps1` (or POSIX `.agent/hooks/pre-commit.sh`) scans the repository for language and framework markers (e.g., `go.mod`, `package.json`, `Cargo.toml`, `requirements.txt`). It automatically symlinks matching domain skills from `.agent/.registry` into `.agents/skills/` (Antigravity's native workspace customization root).
-- **Zero-Friction Windows & POSIX Support**:
-  Hooks and setup scripts seamlessly handle Windows Developer Mode symlinks with automatic fallback to NTFS directory junctions (`mklink /J`), alongside standard POSIX symlinks (`ln -s`) for Linux, macOS, and DevContainers.
-- **Strict Agent Governance**:
-  [`AGENTS.md`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/AGENTS.md) defines explicit protocol steps for AI coding agents on initialization: verifying Git hooks, running initial skill discovery, keeping context windows lean, and requiring testing/linting before staging code changes.
-- **Clean Root Architecture**:
-  Orchestration scripts, submodules, hook triggers, and manifest state live encapsulated under `.agent/`, while IDE customization discovery lives in [`.agents/skills/`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/.agents/skills).
-- **In-House Repository Knowledge Graph**:
-  Built-in support for atomic documentation, architecture decision records (ADRs), and bidirectional wikilinks in `wiki/`. Verified via pre-commit linting to ensure zero dead links. Subgraph queries and interactive HTML graph visualization powered by the zero-dependency `.agent/wiki.ps1` (or `wiki.sh`) tool.
-
----
-
-## Directory Structure
-
-```text
-AgenticTemplate/
-├── .agent/
-│   ├── .registry/             # Git submodule: centralized agent-skills-vault
-│   ├── hooks/
-│   │   ├── pre-commit.ps1     # Submodule auto-sync & skill detection (PowerShell)
-│   │   └── pre-commit.sh      # Submodule auto-sync & skill detection (POSIX sh)
-│   ├── wiki.ps1               # Quick CLI launcher for wiki-engine (Windows)
-│   ├── wiki.sh                # Quick CLI launcher for wiki-engine (Linux/macOS)
-│   ├── .active-skills.json    # Manifest of currently active workspace skills
-│   ├── setup.ps1              # One-command workspace bootstrap & hook installer (Windows)
-│   └── setup.sh               # One-command workspace bootstrap & hook installer (Linux/macOS)
-├── .agents/
-│   └── skills/                # Antigravity customization discovery root (symlinks gitignored)
-│       └── .gitkeep
-├── wiki/                      # Repository Knowledge Graph & ADRs (Markdown)
-│   ├── index.md               # Root knowledge graph entrypoint
-│   ├── architecture.md        # High-level architecture specification
-│   └── adr/                   # Architecture Decision Records
-│       └── 001-initial-architecture.md
-├── AGENTS.md                  # Antigravity agent directives & bootstrap protocol
-├── README.example.md          # Scaffolding template README for downstream projects
-├── README.md                  # System documentation for AgenticTemplate
-├── .gitattributes             # Git normalization (LF line endings for scripts)
-├── .gitmodules                # Submodule registration for .agent/.registry
-└── .gitignore                 # Standard ignores for build outputs & dynamic links
-```
+1. **Elimination of Coordinated Omission:**
+   CruciVec tracks dual histograms per worker task:
+   *   `service_time`: Network round-trip duration ($t_{\text{recv}} - t_{\text{sent}}$).
+   *   `total_response_time`: True end-to-end latency including client queue delay ($t_{\text{recv}} - t_{\text{intended}}$).
+2. **Deterministic Point-in-Time Ground Truth:**
+   Ground truth is never evaluated against mutable live state. Mutations are appended to an immutable binary WAL with monotonic Log Sequence Numbers (LSNs). Queries record their observed commit boundary, and ground-truth nearest neighbors are reconstructed post-hoc.
+3. **Decoupled Ground-Truth Computation:**
+   Brute-force SIMD scans are executed offline to prevent memory bus and cache pollution during the live benchmark run.
+4. **Stratified Modulo Selectivity:**
+   Metadata filter queries are partitioned into three calibrated cohorts:
+   *   High Selectivity: ~60% match rate (`id % 10 in [0..5]`).
+   *   Medium Selectivity: ~10% match rate (`id % 10 == 0`).
+   *   Needle-in-a-Haystack: ~0.1% match rate (`id % 1000 == 42`).
 
 ---
 
-## Quick Start
+## 3. Quick Start
 
-### 1. Initialize Workspace
-Run the automated setup script from PowerShell (Windows):
-
-```powershell
-.\.agent\setup.ps1
-```
-
-Or from a POSIX shell (Linux/macOS/DevContainers):
+### Build CruciVec
 ```bash
-./.agent/setup.sh
+cargo build --release
 ```
 
-The setup script will:
-1. Ensure the workspace is a valid Git repository and set the root directory.
-2. Initialize and pull the `.agent/.registry` submodule from the skills vault.
-3. Configure the Git `.git/hooks/pre-commit` hook to run synchronization on every commit.
-4. Execute an immediate initial synchronization pass into `.agents/skills/`.
+### Run an Open-Loop Benchmark
+```bash
+./target/release/crucivec run \
+    --target qdrant \
+    --qps 10000 \
+    --workload churn-70-20-10 \
+    --dataset cohere-1m
+```
 
-### 2. Fresh Repository Setup & Cleanup
-When scaffolding a new application from this template into a fresh repository:
-1. **Remove Template Disclaimer**:
-   - Permanently delete the `> [!WARNING]` block at the very top of [`README.md`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/README.md).
-   - Alternatively, replace [`README.md`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/README.md) entirely using [`README.example.md`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/README.example.md) as your starter specification, and delete [`README.example.md`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/README.example.md).
-2. **Private Skills Vault Check**:
-   - If you do not have access to the private `agent-skills-vault`, either link your own submodule to `.agent/.registry` or remove `.agent/hooks/` and the pre-commit hook triggers.
-3. **Populate Stack & Commit**:
-   - Add your application source code and stack manifest files (e.g., `package.json`, `go.mod`, `Cargo.toml`, `requirements.txt`).
-   - Commit your changes—the pre-commit hook will automatically detect your project stack and symlink matching domain skills into [`.agents/skills/`](file:///c:/Users/Bhatn/OneDrive/Desktop/Projects/AgenticTemplate/.agents/skills).
+### Replay WAL for Offline Recall@K Verification
+```bash
+./target/release/crucivec verify \
+    --wal-path ./runs/qdrant_churn.wal \
+    --queries ./data/cohere_queries.bin \
+    --k 10
+```
 
 ---
 
-## Global Skills vs. Workspace Domain Skills
+## 4. Repository Knowledge Graph
 
-Antigravity operates with a two-tier skill model:
-
-1. **Global Skills** (`~/.gemini/config/skills/`):
-   Always available across all workspaces on the machine (`code-review`, `doc-sync`, `error-discipline`, `git-release`, `incident-triaging`, `intent-discipline`, `repo-wiki`, `script-optimization`, `security-auditor`, `strategic-reconnaissance`, `test-discipline`, `workspace-initializer`). These are never linked into `.agents/skills/`.
-2. **Workspace Domain Skills** (`.agents/skills/`):
-   Language-, framework-, and stack-specific skills (e.g., `go`, `react`, `rust`, `python`) dynamically linked from the vendored `.agent/.registry` based on active repository files.
+Architectural Decision Records (ADRs) are documented in `wiki/`:
+*   [[wiki/adr/001-initial-architecture]]: Foundational baseline and modular boundaries.
+*   [[wiki/adr/002-open-loop-wal-architecture]]: Pacer TSC design, bytemuck WAL layout, and SIMD linear scans.
