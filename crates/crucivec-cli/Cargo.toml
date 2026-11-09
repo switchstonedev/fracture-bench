@@ -1,0 +1,30 @@
+[package]
+name = "crucivec-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Main executable harness for CruciVec open-loop vector database benchmarking"
+
+[[bin]]
+name = "crucivec"
+path = "src/main.rs"
+
+[dependencies]
+crucivec-core = { workspace = true }
+crucivec-pacer = { workspace = true }
+crucivec-telemetry = { workspace = true }
+crucivec-adapters = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+hdrhistogram = { workspace = true }
+crossbeam-channel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+
