@@ -11,6 +11,8 @@ use tokio::task::JoinHandle;
 
 use crate::workloads::WorkloadGenerator;
 
+type WorkerMetrics = (Histogram<u64>, Histogram<u64>, u64);
+
 /// Final structured benchmark performance report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkReport {
@@ -19,9 +21,11 @@ pub struct BenchmarkReport {
     pub unserved_arrivals: u64,
     pub achieved_qps: f64,
     pub service_time_p50_us: f64,
+    pub service_time_p90_us: f64,
     pub service_time_p99_us: f64,
     pub service_time_p999_us: f64,
     pub total_time_p50_us: f64,
+    pub total_time_p90_us: f64,
     pub total_time_p99_us: f64,
     pub total_time_p999_us: f64,
 }
@@ -46,7 +50,7 @@ impl BenchmarkRunner {
         duration: Duration,
         unserved_arrivals: u64,
     ) -> BenchmarkReport {
-        let mut handles: Vec<JoinHandle<(Histogram<u64>, Histogram<u64>, u64)>> = Vec::with_capacity(self.workers);
+        let mut handles: Vec<JoinHandle<WorkerMetrics>> = Vec::with_capacity(self.workers);
 
         for worker_id in 0..self.workers {
             let rx = receiver.clone();
@@ -77,9 +81,8 @@ impl BenchmarkRunner {
                             let query_vec = workload.generate_vector();
                             let _ = adapter_clone.search(&query_vec, k, filter.as_ref()).await;
                         }
-                        QueryType::Upsert { id } => {
-                            let vec = workload.generate_vector();
-                            let _ = adapter_clone.upsert(id, &vec).await;
+                        QueryType::Upsert { id, vector } => {
+                            let _ = adapter_clone.upsert(id, &vector).await;
                         }
                         QueryType::Delete { id } => {
                             let _ = adapter_clone.delete(id).await;
@@ -130,9 +133,11 @@ impl BenchmarkRunner {
             unserved_arrivals,
             achieved_qps,
             service_time_p50_us: (global_service_hist.value_at_quantile(0.50) as f64) / 1000.0,
+            service_time_p90_us: (global_service_hist.value_at_quantile(0.90) as f64) / 1000.0,
             service_time_p99_us: (global_service_hist.value_at_quantile(0.99) as f64) / 1000.0,
             service_time_p999_us: (global_service_hist.value_at_quantile(0.999) as f64) / 1000.0,
             total_time_p50_us: (global_total_hist.value_at_quantile(0.50) as f64) / 1000.0,
+            total_time_p90_us: (global_total_hist.value_at_quantile(0.90) as f64) / 1000.0,
             total_time_p99_us: (global_total_hist.value_at_quantile(0.99) as f64) / 1000.0,
             total_time_p999_us: (global_total_hist.value_at_quantile(0.999) as f64) / 1000.0,
         }

@@ -2,14 +2,21 @@ mod runner;
 mod verify;
 mod workloads;
 
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use crucivec_adapters::{MockVectorAdapter, VectorEngineAdapter};
-use crucivec_pacer::{HardwarePacer, PacerConfig};
+use crucivec_adapters::{
+    LanceDbAdapter, LanceDbConfig, MilvusAdapter, MilvusConfig, MockVectorAdapter,
+    PgvectorAdapter, PgvectorConfig, QdrantAdapter, QdrantConfig, VectorEngineAdapter,
+};
+use crucivec_core::types::{CollectionSchema, DistanceMetric};
+use crucivec_core::wal::WalReader;
+use crucivec_pacer::{HardwarePacer, PacerConfig, WorkloadConfig, WorkloadType};
 use crucivec_telemetry::TelemetrySampler;
 use runner::BenchmarkRunner;
 
@@ -44,9 +51,29 @@ enum Commands {
         #[arg(long, default_value_t = 128)]
         dimension: usize,
 
+        /// Workload profile [churn-70-20-10, read-heavy-90-10, write-heavy-50-50, search-only]
+        #[arg(long, default_value = "churn-70-20-10")]
+        workload: String,
+
+        /// Optional path to record mutation WAL file
+        #[arg(long)]
+        wal_path: Option<PathBuf>,
+
         /// Optional path to target Linux cgroup v2 directory (e.g. /sys/fs/cgroup/docker/...)
         #[arg(long)]
         cgroup_path: Option<PathBuf>,
+
+        /// Optional path to export JSON benchmark results
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Target database endpoint URI (e.g. http://127.0.0.1:6333)
+        #[arg(short, long)]
+        endpoint: Option<String>,
+
+        /// Number of nearest neighbors to retrieve per query
+        #[arg(short, long, default_value_t = 10)]
+        k: usize,
     },
 
     /// Replay binary WAL offline to evaluate exact k-NN ground truth and recall drift
@@ -62,6 +89,18 @@ enum Commands {
         /// Top-K nearest neighbors
         #[arg(short, long, default_value_t = 10)]
         k: usize,
+
+        /// Optional path to query vectors file (.json or .bin)
+        #[arg(short, long)]
+        queries: Option<PathBuf>,
+
+        /// Optional target engine to evaluate live recall against WAL [mock, qdrant, pgvector, milvus, lancedb]
+        #[arg(short, long)]
+        target: Option<String>,
+
+        /// Optional endpoint for target engine
+        #[arg(short, long)]
+        endpoint: Option<String>,
     },
 
     /// Profile target cgroup v2 kernel telemetry in real-time
@@ -87,7 +126,12 @@ async fn main() -> anyhow::Result<()> {
             duration_sec,
             workers,
             dimension,
+            workload,
+            wal_path,
             cgroup_path,
+            output,
+            endpoint,
+            k,
         } => {
             println!("===========================================================");
             println!("  CruciVec: Running Open-Loop Hardware-Paced Benchmark     ");
@@ -97,19 +141,80 @@ async fn main() -> anyhow::Result<()> {
             println!("Duration      : {}s", duration_sec);
             println!("Workers       : {}", workers);
             println!("Vector Dim    : {}", dimension);
+            println!("Workload      : {}", workload);
+            if let Some(ref w) = wal_path {
+                if let Some(parent) = w.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                println!("WAL Output    : {:?}", w);
+            }
+            if let Some(ref o) = output {
+                if let Some(parent) = o.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+            }
+            if let Some(ref c) = cgroup_path {
+                println!("Cgroup v2 Path: {:?}", c);
+            }
 
             let adapter: Arc<dyn VectorEngineAdapter> = match target.to_lowercase().as_str() {
                 "mock" => Arc::new(MockVectorAdapter::new(500, 50)), // Simulate 50ms compaction pauses
-                _ => Arc::new(MockVectorAdapter::default()),
+                "qdrant" => {
+                    let mut cfg = QdrantConfig::default();
+                    if let Some(ep) = endpoint {
+                        cfg.endpoint = ep;
+                    }
+                    Arc::new(QdrantAdapter::new(cfg))
+                }
+                "milvus" => {
+                    let mut cfg = MilvusConfig::default();
+                    if let Some(ep) = endpoint {
+                        cfg.endpoint = ep;
+                    }
+                    Arc::new(MilvusAdapter::new(cfg))
+                }
+                "pgvector" => {
+                    let mut cfg = PgvectorConfig::default();
+                    if let Some(ep) = endpoint {
+                        cfg.connection_string = ep;
+                    }
+                    Arc::new(PgvectorAdapter::new(cfg))
+                }
+                "lancedb" => {
+                    let mut cfg = LanceDbConfig::default();
+                    if let Some(ep) = endpoint {
+                        cfg.uri = ep;
+                    }
+                    Arc::new(LanceDbAdapter::new(cfg))
+                }
+                other => {
+                    eprintln!("Unknown target engine '{}', defaulting to Mock adapter", other);
+                    Arc::new(MockVectorAdapter::default())
+                }
             };
+
+            // Initialize target schema
+            let schema = CollectionSchema {
+                name: "crucivec_bench".to_string(),
+                dimension,
+                metric: DistanceMetric::Cosine,
+            };
+            if let Err(e) = adapter.init(&schema).await {
+                eprintln!("Notice: Engine init returned: {}", e);
+            }
+
+            let w_type: WorkloadType = workload.parse().unwrap_or(WorkloadType::Churn70_20_10);
+            let w_config = WorkloadConfig::new(w_type, dimension, k);
 
             // 1. Launch Hardware Pacer
             let pacer_config = PacerConfig {
                 target_qps: qps,
-                channel_capacity: 32_768,
-                pinned_core_id: None, // Will use isolated core on bare-metal runs
+                channel_capacity: 65_536,
+                pinned_core_id: None, // Pin on bare metal runs
                 seed: 42,
                 hybrid_sleep_threshold_us: 100,
+                workload: w_config,
+                wal_path,
             };
             let pacer = HardwarePacer::spawn(pacer_config);
             let rx = pacer.ticket_receiver();
@@ -139,20 +244,22 @@ async fn main() -> anyhow::Result<()> {
                 (Vec::new(), Default::default())
             };
 
+            let pacer_p99_jitter = jitter_hist.as_ref().map(|h| h.value_at_quantile(0.99) as f64 / 1000.0).unwrap_or(0.0);
+
             println!("\n================ Benchmark Results ================");
             println!("Completed Operations: {}", report.total_completed);
             println!("Achieved Throughput : {:.1} QPS", report.achieved_qps);
             println!("Unserved Drops      : {}", report.unserved_arrivals);
             println!("---------------- Latency Percentiles --------------");
             println!("Service Time (p50)  : {:.2} µs", report.service_time_p50_us);
+            println!("Service Time (p90)  : {:.2} µs", report.service_time_p90_us);
             println!("Service Time (p99)  : {:.2} µs", report.service_time_p99_us);
             println!("Service Time (p99.9): {:.2} µs", report.service_time_p999_us);
             println!("Total Time   (p50)  : {:.2} µs", report.total_time_p50_us);
+            println!("Total Time   (p90)  : {:.2} µs", report.total_time_p90_us);
             println!("Total Time   (p99)  : {:.2} µs", report.total_time_p99_us);
             println!("Total Time   (p99.9): {:.2} µs", report.total_time_p999_us);
-            if let Some(hist) = jitter_hist {
-                println!("Pacer Jitter (p99)  : {:.2} µs", hist.value_at_quantile(0.99) as f64 / 1000.0);
-            }
+            println!("Pacer Jitter (p99)  : {:.2} µs", pacer_p99_jitter);
             if telemetry_summary.total_samples > 0 {
                 println!("---------------- Kernel Telemetry -----------------");
                 println!("Major Page Faults   : {}", telemetry_summary.net_pgmajfault);
@@ -160,9 +267,25 @@ async fn main() -> anyhow::Result<()> {
                 println!("CFS Throttled µs    : {}", telemetry_summary.net_throttled_usec);
             }
             println!("===================================================");
+
+            // Export results if output path requested
+            if let Some(out_path) = output {
+                let full_export = serde_json::json!({
+                    "target": target,
+                    "target_qps": qps,
+                    "dimension": dimension,
+                    "workload": workload,
+                    "report": report,
+                    "pacer_jitter_p99_us": pacer_p99_jitter,
+                    "telemetry": telemetry_summary,
+                });
+                let mut f = File::create(&out_path)?;
+                f.write_all(serde_json::to_string_pretty(&full_export)?.as_bytes())?;
+                println!("Exported benchmark JSON -> {:?}", out_path);
+            }
         }
 
-        Commands::Verify { wal_path, cutoff_lsn, k } => {
+        Commands::Verify { wal_path, cutoff_lsn, k, queries, target, endpoint } => {
             println!("===========================================================");
             println!("  CruciVec: Replaying Binary WAL for Point-in-Time Ground Truth ");
             println!("===========================================================");
@@ -170,32 +293,79 @@ async fn main() -> anyhow::Result<()> {
             println!("Cutoff LSN : {}", cutoff_lsn);
             println!("K          : {}", k);
 
-            let mut reader = crucivec_core::wal::WalReader::open(&wal_path)?;
+            let mut reader = WalReader::open(&wal_path)?;
             let snapshot = reader.reconstruct_state(cutoff_lsn)?;
             println!("Active Vectors : {}", snapshot.active_vectors.len());
             println!("Tombstone Count: {}", snapshot.tombstoned_ids.len());
 
-            // If query vectors exist, run exact verify_wal_recall
-            let dummy_queries = vec![vec![1.0f32; 128]];
-            let dummy_results = vec![vec![1u64]];
-            let report = verify::verify_wal_recall(
+            if snapshot.active_vectors.is_empty() {
+                println!("Notice: WAL contains zero active vectors at cutoff LSN {}.", cutoff_lsn);
+                return Ok(());
+            }
+
+            // Determine query vectors
+            let dim = snapshot.active_vectors.values().next().map(|v| v.len()).unwrap_or(128);
+            let query_list = if let Some(ref q_path) = queries {
+                verify::load_queries_from_file(q_path)?
+            } else {
+                verify::generate_synthetic_queries(dim, 50, 42)
+            };
+            println!("Evaluated Queries: {}", query_list.len());
+
+            let target_adapter: Arc<dyn VectorEngineAdapter> = match target.as_deref() {
+                Some("qdrant") => {
+                    let mut cfg = QdrantConfig::default();
+                    if let Some(ep) = endpoint { cfg.endpoint = ep; }
+                    Arc::new(QdrantAdapter::new(cfg))
+                }
+                Some("milvus") => {
+                    let mut cfg = MilvusConfig::default();
+                    if let Some(ep) = endpoint { cfg.endpoint = ep; }
+                    Arc::new(MilvusAdapter::new(cfg))
+                }
+                Some("pgvector") => {
+                    let mut cfg = PgvectorConfig::default();
+                    if let Some(ep) = endpoint { cfg.connection_string = ep; }
+                    Arc::new(PgvectorAdapter::new(cfg))
+                }
+                Some("lancedb") => {
+                    let mut cfg = LanceDbConfig::default();
+                    if let Some(ep) = endpoint { cfg.uri = ep; }
+                    Arc::new(LanceDbAdapter::new(cfg))
+                }
+                _ => Arc::new(MockVectorAdapter::default()),
+            };
+
+            // If using mock adapter, load active vectors into mock adapter to test exact retrieval
+            if target.is_none() || target.as_deref() == Some("mock") {
+                let schema = CollectionSchema {
+                    name: "verify".into(),
+                    dimension: dim,
+                    metric: DistanceMetric::Cosine,
+                };
+                let _ = target_adapter.init(&schema).await;
+                for (&id, vec) in &snapshot.active_vectors {
+                    let _ = target_adapter.upsert(id, vec).await;
+                }
+            }
+
+            let report = verify::verify_with_target_adapter(
                 &wal_path,
                 cutoff_lsn,
-                &dummy_queries,
-                &dummy_results,
+                &query_list,
+                target_adapter,
                 k,
-                crucivec_core::types::DistanceMetric::Euclidean,
-            ).unwrap_or(verify::RecallVerificationReport {
-                cutoff_lsn,
-                active_vectors_count: snapshot.active_vectors.len(),
-                tombstone_count: snapshot.tombstoned_ids.len(),
-                evaluated_queries: 0,
-                mean_recall_at_k: 0.0,
-                k,
-            });
+                DistanceMetric::Cosine,
+            ).await?;
 
-            println!("Evaluated Recall@K: {:.4}", report.mean_recall_at_k);
-            println!("Exact verification completed successfully.");
+            println!("---------------- Ground Truth Verification --------------");
+            println!("Cutoff LSN         : {}", report.cutoff_lsn);
+            println!("Active Vectors     : {}", report.active_vectors_count);
+            println!("Tombstones         : {}", report.tombstone_count);
+            println!("Evaluated Queries  : {}", report.evaluated_queries);
+            println!("Top-K Candidates   : {}", report.k);
+            println!("Mean Recall@{}     : {:.4}", report.k, report.mean_recall_at_k);
+            println!("=========================================================");
         }
 
         Commands::Profile { cgroup_path, duration_sec } => {

@@ -3,6 +3,8 @@ pub mod qdrant;
 pub mod pgvector;
 pub mod milvus;
 pub mod lancedb;
+pub(crate) mod http_client;
+pub(crate) mod pg_client;
 
 use async_trait::async_trait;
 use crucivec_core::types::{CollectionSchema, FilterPredicate};

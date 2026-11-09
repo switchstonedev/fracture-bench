@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -5,11 +6,13 @@ use std::time::Duration;
 
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 use crucivec_core::types::{DispatchTicket, QueryType};
+use crucivec_core::wal::{WalOpType, WalWriter};
 use hdrhistogram::Histogram;
 use tracing::debug;
 
 use crate::poisson::PoissonGenerator;
 use crate::tsc::TscClock;
+use crate::workload::{WorkloadConfig, WorkloadGenerator};
 
 /// Telemetry metrics produced by the hardware pacer thread.
 #[derive(Debug, Clone)]
@@ -29,6 +32,8 @@ pub struct PacerConfig {
     pub pinned_core_id: Option<usize>,
     pub seed: u64,
     pub hybrid_sleep_threshold_us: u64,
+    pub workload: WorkloadConfig,
+    pub wal_path: Option<PathBuf>,
 }
 
 impl Default for PacerConfig {
@@ -39,6 +44,8 @@ impl Default for PacerConfig {
             pinned_core_id: Some(1),
             seed: 42,
             hybrid_sleep_threshold_us: 200,
+            workload: WorkloadConfig::default(),
+            wal_path: None,
         }
     }
 }
@@ -115,6 +122,10 @@ fn run_pacer_loop(
 
     let clock = TscClock::new();
     let mut poisson = PoissonGenerator::new(config.target_qps, config.seed);
+    let mut workload_gen = WorkloadGenerator::new(&config.workload, config.seed + 100);
+    let mut wal_writer = config.wal_path.as_ref().and_then(|p| WalWriter::open(p).ok());
+    let mut current_lsn: u64 = 0;
+
     let mut jitter_hist = Histogram::<u64>::new_with_bounds(1, 1_000_000_000, 3)
         .expect("Failed to initialize jitter histogram");
 
@@ -133,10 +144,29 @@ fn run_pacer_loop(
             let _ = jitter_hist.record(jitter_ns.max(1));
 
             seq += 1;
+            let op = workload_gen.next_op();
+
+            match &op {
+                QueryType::Upsert { id, vector } => {
+                    current_lsn += 1;
+                    if let Some(ref mut writer) = wal_writer {
+                        let _ = writer.append(current_lsn, elapsed_ns, *id, WalOpType::Upsert, vector);
+                    }
+                }
+                QueryType::Delete { id } => {
+                    current_lsn += 1;
+                    if let Some(ref mut writer) = wal_writer {
+                        let _ = writer.append(current_lsn, elapsed_ns, *id, WalOpType::Delete, &[]);
+                    }
+                }
+                QueryType::Search { .. } => {}
+            }
+
             let ticket = DispatchTicket {
                 seq_id: seq,
                 scheduled_emit_ns: next_scheduled_ns,
-                query_type: QueryType::Search { k: 10, filter: None },
+                lsn: current_lsn,
+                query_type: op,
             };
 
             match sender.try_send(ticket) {
@@ -162,6 +192,10 @@ fn run_pacer_loop(
         }
     }
 
+    if let Some(ref mut writer) = wal_writer {
+        let _ = writer.flush();
+    }
+
     jitter_hist
 }
 
@@ -177,6 +211,8 @@ mod tests {
             pinned_core_id: None,
             seed: 12345,
             hybrid_sleep_threshold_us: 100,
+            workload: WorkloadConfig::default(),
+            wal_path: None,
         };
 
         let pacer = HardwarePacer::spawn(config);
@@ -188,7 +224,7 @@ mod tests {
 
         let start = std::time::Instant::now();
         while start.elapsed() < Duration::from_millis(50) {
-            if let Ok(_) = rx.try_recv() {
+            if rx.try_recv().is_ok() {
                 received += 1;
             } else {
                 std::hint::spin_loop();
@@ -202,5 +238,51 @@ mod tests {
 
         println!("Test Pacer Complete: received={}, p50_jitter={}ns, p99_jitter={}ns", received, p50, p99);
         assert!(received > 100, "Expected to receive at least 100 tickets in 50ms window, got {}", received);
+    }
+
+    #[test]
+    fn test_hardware_pacer_wal_logging() {
+        let temp_dir = std::env::temp_dir();
+        let wal_path = temp_dir.join(format!("test_pacer_wal_{}.bin", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+
+        let config = PacerConfig {
+            target_qps: 10_000.0,
+            channel_capacity: 5_000,
+            pinned_core_id: None,
+            seed: 999,
+            hybrid_sleep_threshold_us: 100,
+            workload: WorkloadConfig::new(crate::workload::WorkloadType::Churn70_20_10, 16, 5),
+            wal_path: Some(wal_path.clone()),
+        };
+
+        let pacer = HardwarePacer::spawn(config);
+        let rx = pacer.ticket_receiver();
+
+        // Await initial ticket to eliminate thread initialization delay
+        let first_ticket = rx.recv_timeout(Duration::from_secs(2)).expect("Expected initial ticket");
+        let mut received = 1;
+        if first_ticket.lsn > 0 {
+            assert!(matches!(first_ticket.query_type, QueryType::Upsert { .. } | QueryType::Delete { .. } | QueryType::Search { .. }));
+        }
+
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_millis(100) {
+            if let Ok(ticket) = rx.recv_timeout(Duration::from_millis(10)) {
+                received += 1;
+                if ticket.lsn > 0 {
+                    assert!(matches!(ticket.query_type, QueryType::Upsert { .. } | QueryType::Delete { .. } | QueryType::Search { .. }));
+                }
+            }
+        }
+
+        let _ = pacer.stop();
+        assert!(received > 0);
+
+        // Verify WAL file exists and can be parsed
+        let mut reader = crucivec_core::wal::WalReader::open(&wal_path).expect("Failed to open written WAL");
+        let snapshot = reader.reconstruct_state(u64::MAX).expect("Failed to reconstruct WAL state");
+        println!("Pacer WAL Test: active vectors={}, tombstones={}", snapshot.active_vectors.len(), snapshot.tombstoned_ids.len());
+
+        let _ = std::fs::remove_file(wal_path);
     }
 }

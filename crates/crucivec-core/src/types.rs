@@ -8,9 +8,10 @@ pub enum QueryType {
         k: usize,
         filter: Option<FilterPredicate>,
     },
-    /// Insertion or replacement of a vector embedding with an assigned document ID.
+    /// Insertion or replacement of a vector embedding with an assigned document ID and embedding data.
     Upsert {
         id: u64,
+        vector: Vec<f32>,
     },
     /// Hard removal of a vector embedding by ID (HNSW tombstone generation).
     Delete {
@@ -60,6 +61,8 @@ pub struct DispatchTicket {
     pub seq_id: u64,
     /// Absolute timestamp in nanoseconds when this ticket was intended to be emitted.
     pub scheduled_emit_ns: u64,
+    /// Monotonic Log Sequence Number (LSN) associated with the mutation or latest commit boundary.
+    pub lsn: u64,
     /// Targeted query or mutation payload type.
     pub query_type: QueryType,
 }

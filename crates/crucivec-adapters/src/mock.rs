@@ -40,7 +40,7 @@ impl MockVectorAdapter {
     async fn maybe_stall(&self) {
         if self.stall_interval_ticks > 0 && self.stall_duration_ms > 0 {
             let count = self.call_counter.fetch_add(1, Ordering::Relaxed);
-            if count % self.stall_interval_ticks == 0 && count > 0 {
+            if count > 0 && count.is_multiple_of(self.stall_interval_ticks) {
                 tokio::time::sleep(Duration::from_millis(self.stall_duration_ms)).await;
             }
         }

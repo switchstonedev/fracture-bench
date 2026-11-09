@@ -3,6 +3,11 @@ use std::arch::x86_64::*;
 
 /// Computes the dot product between two f32 slices using 256-bit AVX2 + FMA instructions.
 /// Slices must have identical lengths.
+///
+/// # Safety
+/// The caller must ensure that:
+/// - The host CPU supports AVX2 and FMA instruction sets.
+/// - Slices `a` and `b` have equal lengths and point to valid memory.
 #[target_feature(enable = "avx2,fma")]
 #[inline]
 pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
@@ -55,6 +60,11 @@ pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Computes squared Euclidean distance between two f32 slices using 256-bit AVX2 + FMA instructions.
+///
+/// # Safety
+/// The caller must ensure that:
+/// - The host CPU supports AVX2 and FMA instruction sets.
+/// - Slices `a` and `b` have equal lengths and point to valid memory.
 #[target_feature(enable = "avx2,fma")]
 #[inline]
 pub unsafe fn euclidean_distance_sq_avx2(a: &[f32], b: &[f32]) -> f32 {

@@ -176,7 +176,7 @@ impl WalReader {
             let op = WalOpType::from_u8(header.op_type).ok_or(WalError::CorruptedHeader)?;
             match op {
                 WalOpType::Insert | WalOpType::Upsert => {
-                    if payload_len % 4 != 0 {
+                    if !payload_len.is_multiple_of(4) {
                         return Err(WalError::UnalignedVectorBytes { actual: payload_len });
                     }
                     let floats: &[f32] = cast_slice(&vector_buf);

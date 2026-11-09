@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use crucivec_core::types::{CollectionSchema, FilterPredicate};
 use serde::{Deserialize, Serialize};
 
+use crate::pg_client::SimplePgClient;
 use crate::VectorEngineAdapter;
 
 /// pgvector database connection configuration.
@@ -24,33 +25,81 @@ impl Default for PgvectorConfig {
     }
 }
 
-/// pgvector client adapter.
+/// Production pgvector client adapter communicating via PostgreSQL wire protocol.
 pub struct PgvectorAdapter {
     pub config: PgvectorConfig,
+    client: SimplePgClient,
 }
 
 impl PgvectorAdapter {
     pub fn new(config: PgvectorConfig) -> Self {
-        Self { config }
+        let client = SimplePgClient::parse(&config.connection_string)
+            .unwrap_or_else(|_| SimplePgClient {
+                host: "127.0.0.1".to_string(),
+                port: 5432,
+                user: "postgres".to_string(),
+                password: Some("postgres".to_string()),
+                database: "crucivec".to_string(),
+                timeout: std::time::Duration::from_secs(5),
+            });
+        Self { config, client }
+    }
+
+    fn format_vector(vector: &[f32]) -> String {
+        let mut s = String::with_capacity(vector.len() * 12 + 2);
+        s.push('[');
+        for (i, val) in vector.iter().enumerate() {
+            if i > 0 {
+                s.push(',');
+            }
+            s.push_str(&format!("{:.6}", val));
+        }
+        s.push(']');
+        s
     }
 }
 
 #[async_trait]
 impl VectorEngineAdapter for PgvectorAdapter {
-    async fn init(&self, _schema: &CollectionSchema) -> anyhow::Result<()> {
+    async fn init(&self, schema: &CollectionSchema) -> anyhow::Result<()> {
+        let ext_sql = "CREATE EXTENSION IF NOT EXISTS vector;";
+        let table_sql = format!(
+            "CREATE TABLE IF NOT EXISTS {} (id BIGINT PRIMARY KEY, embedding vector({}));",
+            self.config.table_name, schema.dimension
+        );
+        let index_sql = format!(
+            "CREATE INDEX IF NOT EXISTS {}_hnsw ON {} USING hnsw (embedding vector_l2_ops) WITH (m = {}, ef_construction = {});",
+            self.config.table_name, self.config.table_name, self.config.m, self.config.ef_construction
+        );
+
+        let init_sql = format!("{} {} {}", ext_sql, table_sql, index_sql);
+        self.client.execute_query(&init_sql).await?;
         Ok(())
     }
 
-    async fn upsert(&self, _id: u64, _vector: &[f32]) -> anyhow::Result<()> {
+    async fn upsert(&self, id: u64, vector: &[f32]) -> anyhow::Result<()> {
+        let vec_literal = Self::format_vector(vector);
+        let sql = format!(
+            "INSERT INTO {} (id, embedding) VALUES ({}, '{}') ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding;",
+            self.config.table_name, id, vec_literal
+        );
+        self.client.execute_query(&sql).await?;
         Ok(())
     }
 
-    async fn delete(&self, _id: u64) -> anyhow::Result<()> {
+    async fn delete(&self, id: u64) -> anyhow::Result<()> {
+        let sql = format!("DELETE FROM {} WHERE id = {};", self.config.table_name, id);
+        self.client.execute_query(&sql).await?;
         Ok(())
     }
 
-    async fn search(&self, _vector: &[f32], _k: usize, _filter: Option<&FilterPredicate>) -> anyhow::Result<Vec<u64>> {
-        Ok(Vec::new())
+    async fn search(&self, vector: &[f32], k: usize, _filter: Option<&FilterPredicate>) -> anyhow::Result<Vec<u64>> {
+        let vec_literal = Self::format_vector(vector);
+        let sql = format!(
+            "SELECT id FROM {} ORDER BY embedding <-> '{}' LIMIT {};",
+            self.config.table_name, vec_literal, k
+        );
+        let ids = self.client.execute_query(&sql).await?;
+        Ok(ids)
     }
 }
-

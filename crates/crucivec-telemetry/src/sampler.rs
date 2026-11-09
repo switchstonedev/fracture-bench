@@ -55,7 +55,7 @@ impl TelemetrySampler {
 
                 samples
             })
-            .map_err(|e| TelemetryError::Io(e))?;
+            .map_err(TelemetryError::Io)?;
 
         Ok(Self {
             running,
