@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: crucivec_pgvector
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=crucivec
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_SHARED_BUFFERS=4GB
+      - POSTGRES_WORK_MEM=128MB
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4.00'
+          memory: 8192M
+        reservations:
+          cpus: '4.00'
+          memory: 7168M
+
+volumes:
+  pgvector_data:
