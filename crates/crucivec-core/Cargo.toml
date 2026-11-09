@@ -1,0 +1,19 @@
+[package]
+name = "crucivec-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared domain types, zero-copy binary WAL serialization, and SIMD exact k-NN kernels"
+
+[dependencies]
+bytemuck = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+rand = { workspace = true }
+
