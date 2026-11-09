@@ -121,3 +121,4 @@ To eliminate arbitrary filter predicate bias, queries are partitioned into three
 * **Poisson Mean Convergence:** Across 100,000 generated samples, empirical mean must match theoretical mean within +/- 2%.
 * **SIMD Equivalence Tolerance:** AVX2/FMA linear scan dot-product and Euclidean distance kernels must match scalar baseline outputs within an epsilon tolerance of 1e-4.
 * **Recall Confidence Intervals:** Pareto curves report 95% non-parametric bootstrap confidence intervals across a minimum of 5 random seeds.
+
