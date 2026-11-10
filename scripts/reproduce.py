@@ -162,13 +162,26 @@ def main():
     if res_report.returncode != 0:
         print(f"[!] Report generator exited with return code {res_report.returncode}")
 
-    # Step 4: Verification of Generated Artifacts
+    # Step 4: Quantify Graph Degradation & Recall Drift
+    print("\n[*] Measuring point-in-time graph degradation & recall drift curve...")
+    drift_py = scripts_dir / "measure_drift.py"
+    drift_cmd = [
+        sys.executable,
+        str(drift_py),
+        "--output-dir", args.output_dir,
+    ]
+    res_drift = subprocess.run(drift_cmd, cwd=workspace_root, check=False)
+    if res_drift.returncode != 0:
+        print(f"[!] Drift analyzer exited with return code {res_drift.returncode}")
+
+    # Step 5: Verification of Generated Artifacts
     out_dir = workspace_root / args.output_dir
     expected_artifacts = [
         out_dir / "benchmark_summary.md",
         out_dir / "benchmark_summary.tex",
         out_dir / "figures" / "dual_cdf.svg",
         out_dir / "figures" / "pareto_frontier.svg",
+        out_dir / "figures" / "recall_drift.svg",
     ]
 
     print("\n================ Reproduction Verification ================")
@@ -190,3 +203,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
