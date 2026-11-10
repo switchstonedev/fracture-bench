@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" width="720" height="420">
+<style>
+  .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: bold; fill: #111; }
+  .axis { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; fill: #555; }
+  .grid { stroke: #e0e0e0; stroke-dasharray: 3,3; }
+  .legend { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; }
+  .point { stroke-width: 1.5; stroke: #fff; }
+</style>
+<rect width="720" height="420" fill="#ffffff" />
+<text x="75" y="25" class="title">Pareto Frontier: Retrieval Recall@10 vs. Sustainable Throughput (QPS)</text>
+<line x1="75.0" y1="45" x2="75.0" y2="360" class="grid" />
+<text x="75.0" y="378" text-anchor="middle" class="axis">0.0</text>
+<line x1="194.0" y1="45" x2="194.0" y2="360" class="grid" />
+<text x="194.0" y="378" text-anchor="middle" class="axis">0.2</text>
+<line x1="313.0" y1="45" x2="313.0" y2="360" class="grid" />
+<text x="313.0" y="378" text-anchor="middle" class="axis">0.4</text>
+<line x1="432.0" y1="45" x2="432.0" y2="360" class="grid" />
+<text x="432.0" y="378" text-anchor="middle" class="axis">0.6</text>
+<line x1="551.0" y1="45" x2="551.0" y2="360" class="grid" />
+<text x="551.0" y="378" text-anchor="middle" class="axis">0.8</text>
+<line x1="670.0" y1="45" x2="670.0" y2="360" class="grid" />
+<text x="670.0" y="378" text-anchor="middle" class="axis">1.0</text>
+<line x1="75" y1="360.0" x2="670" y2="360.0" class="grid" />
+<text x="65" y="364.0" text-anchor="end" class="axis">0</text>
+<line x1="75" y1="281.25" x2="670" y2="281.25" class="grid" />
+<text x="65" y="285.25" text-anchor="end" class="axis">25</text>
+<line x1="75" y1="202.5" x2="670" y2="202.5" class="grid" />
+<text x="65" y="206.5" text-anchor="end" class="axis">50</text>
+<line x1="75" y1="123.75" x2="670" y2="123.75" class="grid" />
+<text x="65" y="127.75" text-anchor="end" class="axis">75</text>
+<line x1="75" y1="45.0" x2="670" y2="45.0" class="grid" />
+<text x="65" y="49.0" text-anchor="end" class="axis">100</text>
+<circle cx="670.0" cy="133.2" r="5.5" fill="#2ca02c" class="point" />
+<text x="678.0" y="137.2" font-family="sans-serif" font-size="9" fill="#333">mock (churn)</text>
+<circle cx="670.0" cy="133.2" r="5.5" fill="#2ca02c" class="point" />
+<text x="678.0" y="137.2" font-family="sans-serif" font-size="9" fill="#333">mock (read)</text>
+<circle cx="670.0" cy="130.1" r="5.5" fill="#2ca02c" class="point" />
+<text x="678.0" y="134.1" font-family="sans-serif" font-size="9" fill="#333">mock (write)</text>
+<circle cx="122.6" cy="136.4" r="5.5" fill="#1f77b4" class="point" />
+<text x="130.6" y="140.4" font-family="sans-serif" font-size="9" fill="#333">qdrant (churn)</text>
+<circle cx="133.3" cy="136.4" r="5.5" fill="#1f77b4" class="point" />
+<text x="141.3" y="140.4" font-family="sans-serif" font-size="9" fill="#333">qdrant (read)</text>
+<circle cx="102.4" cy="139.5" r="5.5" fill="#1f77b4" class="point" />
+<text x="110.4" y="143.5" font-family="sans-serif" font-size="9" fill="#333">qdrant (write)</text>
+<circle cx="363.0" cy="171.0" r="5.5" fill="#ff7f0e" class="point" />
+<text x="371.0" y="175.0" font-family="sans-serif" font-size="9" fill="#333">pgvector (churn)</text>
+<circle cx="384.4" cy="158.4" r="5.5" fill="#ff7f0e" class="point" />
+<text x="392.4" y="162.4" font-family="sans-serif" font-size="9" fill="#333">pgvector (read)</text>
+<circle cx="329.7" cy="167.9" r="5.5" fill="#ff7f0e" class="point" />
+<text x="337.7" y="171.9" font-family="sans-serif" font-size="9" fill="#333">pgvector (write)</text>
+<circle cx="75.0" cy="133.2" r="5.5" fill="#d62728" class="point" />
+<text x="83.0" y="137.2" font-family="sans-serif" font-size="9" fill="#333">lancedb (churn)</text>
+<circle cx="75.0" cy="136.4" r="5.5" fill="#d62728" class="point" />
+<text x="83.0" y="140.4" font-family="sans-serif" font-size="9" fill="#333">lancedb (read)</text>
+<circle cx="75.0" cy="130.1" r="5.5" fill="#d62728" class="point" />
+<text x="83.0" y="134.1" font-family="sans-serif" font-size="9" fill="#333">lancedb (write)</text>
+<text x="372.5" y="405" text-anchor="middle" class="axis">Mean Recall@10 (Ground-Truth Correctness)</text>
+<text transform="rotate(-90)" x="-202.5" y="20" text-anchor="middle" class="axis">Achieved Throughput (QPS)</text>
+<rect x="95" y="57" width="10" height="10" fill="#d62728" />
+<text x="111" y="65" class="legend">lancedb (measured)</text>
+<rect x="95" y="73" width="10" height="10" fill="#9467bd" />
+<text x="111" y="81" class="legend">milvus (pending: {qps_milvus})</text>
+<rect x="95" y="89" width="10" height="10" fill="#2ca02c" />
+<text x="111" y="97" class="legend">mock (measured)</text>
+<rect x="95" y="105" width="10" height="10" fill="#ff7f0e" />
+<text x="111" y="113" class="legend">pgvector (measured)</text>
+<rect x="95" y="121" width="10" height="10" fill="#1f77b4" />
+<text x="111" y="129" class="legend">qdrant (measured)</text>
+</svg>

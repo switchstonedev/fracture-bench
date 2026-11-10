@@ -7,6 +7,8 @@
                           "langs/memory-safety",
                           "langs/rust-systems",
                           "langs/rust-native-extensions",
-                          "ops/cicd-pipeline"
+                          "ops/cicd-pipeline",
+                          "domain/jd-latex-resume-synthesizer",
+                          "ops/academic-artifact-evaluation"
                       ]
 }
