@@ -64,6 +64,15 @@ impl VectorEngineAdapter for MockVectorAdapter {
         Ok(())
     }
 
+    async fn upsert_batch(&self, points: &[(u64, Vec<f32>)]) -> anyhow::Result<()> {
+        self.maybe_stall().await;
+        let mut vecs = self.vectors.write().unwrap();
+        for (id, vec) in points {
+            vecs.insert(*id, vec.clone());
+        }
+        Ok(())
+    }
+
     async fn delete(&self, id: u64) -> anyhow::Result<()> {
         self.maybe_stall().await;
         let mut vecs = self.vectors.write().unwrap();
@@ -71,7 +80,12 @@ impl VectorEngineAdapter for MockVectorAdapter {
         Ok(())
     }
 
-    async fn search(&self, query: &[f32], k: usize, filter: Option<&FilterPredicate>) -> anyhow::Result<Vec<u64>> {
+    async fn search(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<&FilterPredicate>,
+    ) -> anyhow::Result<Vec<u64>> {
         self.maybe_stall().await;
         let vecs = self.vectors.read().unwrap();
         let metric = *self.metric.read().unwrap();
@@ -89,7 +103,11 @@ impl VectorEngineAdapter for MockVectorAdapter {
                 let dist = match metric {
                     DistanceMetric::DotProduct => -dot_product(query, vec),
                     DistanceMetric::Euclidean => euclidean_distance_sq(query, vec),
-                    DistanceMetric::Cosine => 1.0 - (dot_product(query, vec) / (dot_product(query, query).sqrt() * dot_product(vec, vec).sqrt()).max(1e-10)),
+                    DistanceMetric::Cosine => {
+                        1.0 - (dot_product(query, vec)
+                            / (dot_product(query, query).sqrt() * dot_product(vec, vec).sqrt())
+                                .max(1e-10))
+                    }
                 };
                 (id, dist)
             })
@@ -119,14 +137,42 @@ mod tests {
         adapter.upsert(2, &[0.0, 1.0, 0.0, 0.0]).await.unwrap();
         adapter.upsert(3, &[0.9, 0.1, 0.0, 0.0]).await.unwrap();
 
-        let hits = adapter.search(&[1.0, 0.0, 0.0, 0.0], 2, None).await.unwrap();
+        let hits = adapter
+            .search(&[1.0, 0.0, 0.0, 0.0], 2, None)
+            .await
+            .unwrap();
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0], 1);
         assert_eq!(hits[1], 3);
 
         adapter.delete(1).await.unwrap();
-        let hits_after = adapter.search(&[1.0, 0.0, 0.0, 0.0], 2, None).await.unwrap();
+        let hits_after = adapter
+            .search(&[1.0, 0.0, 0.0, 0.0], 2, None)
+            .await
+            .unwrap();
         assert_eq!(hits_after[0], 3);
+
+        // Test batch upsert and filter
+        let batch = vec![
+            (10, vec![1.0, 0.0, 0.0, 0.0]),
+            (11, vec![0.0, 1.0, 0.0, 0.0]),
+            (20, vec![0.8, 0.2, 0.0, 0.0]),
+        ];
+        adapter.upsert_batch(&batch).await.unwrap();
+
+        let filter = FilterPredicate::Medium {
+            modulo: 10,
+            target_remainder: 0,
+        };
+        let filtered_hits = adapter
+            .search(&[1.0, 0.0, 0.0, 0.0], 5, Some(&filter))
+            .await
+            .unwrap();
+        // Only IDs where id % 10 == 0: 10, 20
+        assert!(filtered_hits.contains(&10));
+        assert!(filtered_hits.contains(&20));
+        assert!(!filtered_hits.contains(&2));
+        assert!(!filtered_hits.contains(&3));
+        assert!(!filtered_hits.contains(&11));
     }
 }
-

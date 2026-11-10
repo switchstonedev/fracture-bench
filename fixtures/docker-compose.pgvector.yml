@@ -6,11 +6,12 @@ services:
     container_name: crucivec_pgvector
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_DB=crucivec
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST_AUTH_METHOD=trust
       - POSTGRES_SHARED_BUFFERS=4GB
       - POSTGRES_WORK_MEM=128MB
     volumes:

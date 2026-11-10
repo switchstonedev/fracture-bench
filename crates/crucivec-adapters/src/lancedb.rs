@@ -83,6 +83,28 @@ impl VectorEngineAdapter for LanceDbAdapter {
         Ok(())
     }
 
+    async fn upsert_batch(&self, points: &[(u64, Vec<f32>)]) -> anyhow::Result<()> {
+        if points.is_empty() {
+            return Ok(());
+        }
+
+        {
+            let mut vecs = self.vectors.write().unwrap();
+            for (id, vec) in points {
+                vecs.insert(*id, vec.clone());
+            }
+        }
+
+        let path = self.table_path();
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+            for (id, vec) in points {
+                let _ = writeln!(file, "UPSERT {} {}", id, vec.len());
+            }
+        }
+
+        Ok(())
+    }
+
     async fn delete(&self, id: u64) -> anyhow::Result<()> {
         {
             let mut vecs = self.vectors.write().unwrap();
@@ -97,7 +119,12 @@ impl VectorEngineAdapter for LanceDbAdapter {
         Ok(())
     }
 
-    async fn search(&self, vector: &[f32], k: usize, filter: Option<&FilterPredicate>) -> anyhow::Result<Vec<u64>> {
+    async fn search(
+        &self,
+        vector: &[f32],
+        k: usize,
+        filter: Option<&FilterPredicate>,
+    ) -> anyhow::Result<Vec<u64>> {
         let vecs = self.vectors.read().unwrap();
         let metric = *self.metric.read().unwrap();
 
@@ -132,7 +159,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_lancedb_adapter_lifecycle() {
-        let temp_dir = std::env::temp_dir().join(format!("lancedb_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "lancedb_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let config = LanceDbConfig {
             uri: temp_dir.to_str().unwrap().to_string(),
             table_name: "test_coll".to_string(),

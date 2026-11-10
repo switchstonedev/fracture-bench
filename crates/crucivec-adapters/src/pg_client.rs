@@ -16,7 +16,9 @@ pub struct SimplePgClient {
 impl SimplePgClient {
     pub fn parse(conn_str: &str) -> anyhow::Result<Self> {
         // postgresql://user:password@host:port/database
-        let trimmed = conn_str.trim_start_matches("postgresql://").trim_start_matches("postgres://");
+        let trimmed = conn_str
+            .trim_start_matches("postgresql://")
+            .trim_start_matches("postgres://");
         let (user_pass, host_port_db) = if let Some(idx) = trimmed.find('@') {
             (&trimmed[..idx], &trimmed[idx + 1..])
         } else {
@@ -24,7 +26,10 @@ impl SimplePgClient {
         };
 
         let (user, password) = if let Some(idx) = user_pass.find(':') {
-            (user_pass[..idx].to_string(), Some(user_pass[idx + 1..].to_string()))
+            (
+                user_pass[..idx].to_string(),
+                Some(user_pass[idx + 1..].to_string()),
+            )
         } else {
             (user_pass.to_string(), None)
         };
@@ -57,7 +62,13 @@ impl SimplePgClient {
         let mut stream = tokio::time::timeout(self.timeout, TcpStream::connect(&addr))
             .await
             .map_err(|_| anyhow::anyhow!("Connection timeout to PostgreSQL at {}", addr))?
-            .map_err(|e| anyhow::anyhow!("Failed to connect to PostgreSQL at {}: {} (Is PostgreSQL running?)", addr, e))?;
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to connect to PostgreSQL at {}: {} (Is PostgreSQL running?)",
+                    addr,
+                    e
+                )
+            })?;
 
         // 1. Send StartupMessage
         let mut body = Vec::new();
@@ -87,7 +98,8 @@ impl SimplePgClient {
             match msg_type {
                 b'R' => {
                     // Authentication request
-                    let auth_code = i32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                    let auth_code =
+                        i32::from_be_bytes([payload[0], payload[1], payload[2], payload[3]]);
                     if auth_code == 0 {
                         // AuthOk
                     } else if auth_code == 3 {
@@ -108,9 +120,17 @@ impl SimplePgClient {
                         let p_len: i32 = 5 + 35;
                         stream.write_u8(b'p').await?;
                         stream.write_all(&p_len.to_be_bytes()).await?;
-                        let md5_str = format!("md5{:02x}{:02x}{:02x}{:02x}\0", salt[0], salt[1], salt[2], pass.len());
+                        let md5_str = format!(
+                            "md5{:02x}{:02x}{:02x}{:02x}\0",
+                            salt[0],
+                            salt[1],
+                            salt[2],
+                            pass.len()
+                        );
                         stream.write_all(md5_str.as_bytes()).await?;
                         stream.flush().await?;
+                    } else {
+                        anyhow::bail!("Unsupported PostgreSQL authentication auth_code: {}. Please set POSTGRES_HOST_AUTH_METHOD=trust for benchmarking.", auth_code);
                     }
                 }
                 b'K' | b'S' => {
@@ -157,9 +177,11 @@ impl SimplePgClient {
                 b'D' => {
                     // DataRow: num_cols (2 bytes) + col_len (4 bytes) + col_data
                     if payload.len() >= 6 {
-                        let col_len = i32::from_be_bytes([payload[2], payload[3], payload[4], payload[5]]);
+                        let col_len =
+                            i32::from_be_bytes([payload[2], payload[3], payload[4], payload[5]]);
                         if col_len > 0 && 6 + (col_len as usize) <= payload.len() {
-                            let text = std::str::from_utf8(&payload[6..6 + col_len as usize]).unwrap_or("");
+                            let text = std::str::from_utf8(&payload[6..6 + col_len as usize])
+                                .unwrap_or("");
                             if let Ok(id) = text.trim().parse::<u64>() {
                                 ids.push(id);
                             }

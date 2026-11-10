@@ -28,12 +28,11 @@ pub struct MilvusAdapter {
 
 impl MilvusAdapter {
     pub fn new(config: MilvusConfig) -> Self {
-        let client = SimpleHttpClient::new(&config.endpoint)
-            .unwrap_or_else(|_| SimpleHttpClient {
-                host: "127.0.0.1".to_string(),
-                port: 19530,
-                timeout: std::time::Duration::from_secs(5),
-            });
+        let client = SimpleHttpClient::new(&config.endpoint).unwrap_or_else(|_| SimpleHttpClient {
+            host: "127.0.0.1".to_string(),
+            port: 19530,
+            timeout: std::time::Duration::from_secs(5),
+        });
         Self { config, client }
     }
 }
@@ -53,7 +52,10 @@ impl VectorEngineAdapter for MilvusAdapter {
             "metricType": metric
         });
 
-        let (status, resp) = self.client.request("POST", "/v2/vectordb/collections/create", Some(&body)).await?;
+        let (status, resp) = self
+            .client
+            .request("POST", "/v2/vectordb/collections/create", Some(&body))
+            .await?;
         if status == 200 || status == 400 {
             Ok(())
         } else {
@@ -72,11 +74,49 @@ impl VectorEngineAdapter for MilvusAdapter {
             ]
         });
 
-        let (status, resp) = self.client.request("POST", "/v2/vectordb/entities/upsert", Some(&body)).await?;
+        let (status, resp) = self
+            .client
+            .request("POST", "/v2/vectordb/entities/upsert", Some(&body))
+            .await?;
         if status == 200 {
             Ok(())
         } else {
             anyhow::bail!("Milvus upsert failed with status {}: {:?}", status, resp);
+        }
+    }
+
+    async fn upsert_batch(&self, points: &[(u64, Vec<f32>)]) -> anyhow::Result<()> {
+        if points.is_empty() {
+            return Ok(());
+        }
+
+        let data: Vec<serde_json::Value> = points
+            .iter()
+            .map(|(id, vec)| {
+                serde_json::json!({
+                    "id": id,
+                    "vector": vec
+                })
+            })
+            .collect();
+
+        let body = serde_json::json!({
+            "collectionName": self.config.collection_name,
+            "data": data
+        });
+
+        let (status, resp) = self
+            .client
+            .request("POST", "/v2/vectordb/entities/upsert", Some(&body))
+            .await?;
+        if status == 200 {
+            Ok(())
+        } else {
+            anyhow::bail!(
+                "Milvus batch upsert failed with status {}: {:?}",
+                status,
+                resp
+            );
         }
     }
 
@@ -86,7 +126,10 @@ impl VectorEngineAdapter for MilvusAdapter {
             "filter": format!("id in [{}]", id)
         });
 
-        let (status, resp) = self.client.request("POST", "/v2/vectordb/entities/delete", Some(&body)).await?;
+        let (status, resp) = self
+            .client
+            .request("POST", "/v2/vectordb/entities/delete", Some(&body))
+            .await?;
         if status == 200 {
             Ok(())
         } else {
@@ -94,14 +137,48 @@ impl VectorEngineAdapter for MilvusAdapter {
         }
     }
 
-    async fn search(&self, vector: &[f32], k: usize, _filter: Option<&FilterPredicate>) -> anyhow::Result<Vec<u64>> {
-        let body = serde_json::json!({
+    async fn search(
+        &self,
+        vector: &[f32],
+        k: usize,
+        filter: Option<&FilterPredicate>,
+    ) -> anyhow::Result<Vec<u64>> {
+        let mut body = serde_json::json!({
             "collectionName": self.config.collection_name,
             "data": [vector],
             "limit": k
         });
 
-        let (status, resp) = self.client.request("POST", "/v2/vectordb/entities/search", Some(&body)).await?;
+        if let Some(f) = filter {
+            let filter_expr = match f {
+                FilterPredicate::High {
+                    allowed_remainders, ..
+                } => {
+                    let rems = allowed_remainders
+                        .iter()
+                        .map(|r| r.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("id % 10 in [{}]", rems)
+                }
+                FilterPredicate::Medium {
+                    target_remainder, ..
+                } => {
+                    format!("id % 10 == {}", target_remainder)
+                }
+                FilterPredicate::Needle {
+                    target_remainder, ..
+                } => {
+                    format!("id % 1000 == {}", target_remainder)
+                }
+            };
+            body["filter"] = serde_json::Value::String(filter_expr);
+        }
+
+        let (status, resp) = self
+            .client
+            .request("POST", "/v2/vectordb/entities/search", Some(&body))
+            .await?;
         if status != 200 {
             anyhow::bail!("Milvus search failed with status {}: {:?}", status, resp);
         }

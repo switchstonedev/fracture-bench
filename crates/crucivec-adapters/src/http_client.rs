@@ -44,7 +44,13 @@ impl SimpleHttpClient {
         let mut stream = tokio::time::timeout(self.timeout, TcpStream::connect(&addr))
             .await
             .map_err(|_| anyhow::anyhow!("Connection timeout to {}", addr))?
-            .map_err(|e| anyhow::anyhow!("Failed to connect to {}: {} (Is the database running?)", addr, e))?;
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to connect to {}: {} (Is the database running?)",
+                    addr,
+                    e
+                )
+            })?;
 
         let body_bytes = if let Some(b) = body {
             serde_json::to_vec(b)?
@@ -106,4 +112,3 @@ impl SimpleHttpClient {
         Ok((status_code, json_val))
     }
 }
-

@@ -17,7 +17,7 @@ pub struct PgvectorConfig {
 impl Default for PgvectorConfig {
     fn default() -> Self {
         Self {
-            connection_string: "postgresql://postgres:postgres@127.0.0.1:5432/crucivec".to_string(),
+            connection_string: "postgresql://postgres@127.0.0.1:5433/crucivec".to_string(),
             table_name: "vectors".to_string(),
             m: 16,
             ef_construction: 64,
@@ -33,12 +33,12 @@ pub struct PgvectorAdapter {
 
 impl PgvectorAdapter {
     pub fn new(config: PgvectorConfig) -> Self {
-        let client = SimplePgClient::parse(&config.connection_string)
-            .unwrap_or_else(|_| SimplePgClient {
+        let client =
+            SimplePgClient::parse(&config.connection_string).unwrap_or_else(|_| SimplePgClient {
                 host: "127.0.0.1".to_string(),
-                port: 5432,
+                port: 5433,
                 user: "postgres".to_string(),
-                password: Some("postgres".to_string()),
+                password: None,
                 database: "crucivec".to_string(),
                 timeout: std::time::Duration::from_secs(5),
             });
@@ -87,18 +87,75 @@ impl VectorEngineAdapter for PgvectorAdapter {
         Ok(())
     }
 
+    async fn upsert_batch(&self, points: &[(u64, Vec<f32>)]) -> anyhow::Result<()> {
+        if points.is_empty() {
+            return Ok(());
+        }
+
+        let mut sql = format!(
+            "INSERT INTO {} (id, embedding) VALUES ",
+            self.config.table_name
+        );
+        for (i, (id, vec)) in points.iter().enumerate() {
+            if i > 0 {
+                sql.push_str(", ");
+            }
+            sql.push_str(&format!("({}, '{}')", id, Self::format_vector(vec)));
+        }
+        sql.push_str(" ON CONFLICT (id) DO UPDATE SET embedding = EXCLUDED.embedding;");
+
+        self.client.execute_query(&sql).await?;
+        Ok(())
+    }
+
     async fn delete(&self, id: u64) -> anyhow::Result<()> {
         let sql = format!("DELETE FROM {} WHERE id = {};", self.config.table_name, id);
         self.client.execute_query(&sql).await?;
         Ok(())
     }
 
-    async fn search(&self, vector: &[f32], k: usize, _filter: Option<&FilterPredicate>) -> anyhow::Result<Vec<u64>> {
+    async fn search(
+        &self,
+        vector: &[f32],
+        k: usize,
+        filter: Option<&FilterPredicate>,
+    ) -> anyhow::Result<Vec<u64>> {
         let vec_literal = Self::format_vector(vector);
-        let sql = format!(
-            "SELECT id FROM {} ORDER BY embedding <-> '{}' LIMIT {};",
-            self.config.table_name, vec_literal, k
-        );
+        let where_clause = match filter {
+            Some(FilterPredicate::High {
+                allowed_remainders, ..
+            }) => {
+                let rems = allowed_remainders
+                    .iter()
+                    .map(|r| r.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("WHERE (id % 10) IN ({})", rems)
+            }
+            Some(FilterPredicate::Medium {
+                target_remainder, ..
+            }) => {
+                format!("WHERE (id % 10) = {}", target_remainder)
+            }
+            Some(FilterPredicate::Needle {
+                target_remainder, ..
+            }) => {
+                format!("WHERE (id % 1000) = {}", target_remainder)
+            }
+            None => String::new(),
+        };
+
+        let sql = if where_clause.is_empty() {
+            format!(
+                "SELECT id FROM {} ORDER BY embedding <-> '{}' LIMIT {};",
+                self.config.table_name, vec_literal, k
+            )
+        } else {
+            format!(
+                "SELECT id FROM {} {} ORDER BY embedding <-> '{}' LIMIT {};",
+                self.config.table_name, where_clause, vec_literal, k
+            )
+        };
         let ids = self.client.execute_query(&sql).await?;
         Ok(ids)
     }
