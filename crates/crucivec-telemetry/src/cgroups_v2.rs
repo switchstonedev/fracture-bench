@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -63,7 +63,9 @@ impl CgroupReader {
 
             let cpu_fd = unsafe { libc::open(cpu_c.as_ptr(), libc::O_RDONLY) };
             if cpu_fd < 0 {
-                unsafe { libc::close(memory_fd); }
+                unsafe {
+                    libc::close(memory_fd);
+                }
                 return Err(TelemetryError::Io(std::io::Error::last_os_error()));
             }
 
@@ -90,7 +92,11 @@ impl CgroupReader {
                 libc::lseek(self.memory_fd, 0, libc::SEEK_SET);
             }
             let bytes_read = unsafe {
-                libc::read(self.memory_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
+                libc::read(
+                    self.memory_fd,
+                    buf.as_mut_ptr() as *mut libc::c_void,
+                    buf.len(),
+                )
             };
             if bytes_read <= 0 {
                 return Err(TelemetryError::Io(std::io::Error::last_os_error()));
@@ -104,7 +110,11 @@ impl CgroupReader {
                 libc::lseek(self.cpu_fd, 0, libc::SEEK_SET);
             }
             let bytes_read_cpu = unsafe {
-                libc::read(self.cpu_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
+                libc::read(
+                    self.cpu_fd,
+                    buf.as_mut_ptr() as *mut libc::c_void,
+                    buf.len(),
+                )
             };
             if bytes_read_cpu <= 0 {
                 return Err(TelemetryError::Io(std::io::Error::last_os_error()));
@@ -149,7 +159,8 @@ pub fn parse_stat_val(slice: &[u8], key: &[u8]) -> Option<u64> {
     while i + klen <= len {
         // Check if slice[i..i+klen] matches key and is at start of line
         let is_line_start = i == 0 || slice[i - 1] == b'\n';
-        if is_line_start && &slice[i..i + klen] == key && i + klen < len && slice[i + klen] == b' ' {
+        if is_line_start && &slice[i..i + klen] == key && i + klen < len && slice[i + klen] == b' '
+        {
             let mut j = i + klen + 1;
             let mut val: u64 = 0;
             let mut has_digit = false;
@@ -176,7 +187,8 @@ mod tests {
 
     #[test]
     fn test_parse_stat_val() {
-        let sample = b"anon 102400\nfile 204800\npgmajfault 42\nworkingset_refault 99182\npgrefault 1000\n";
+        let sample =
+            b"anon 102400\nfile 204800\npgmajfault 42\nworkingset_refault 99182\npgrefault 1000\n";
         assert_eq!(parse_stat_val(sample, b"pgmajfault"), Some(42));
         assert_eq!(parse_stat_val(sample, b"workingset_refault"), Some(99182));
         assert_eq!(parse_stat_val(sample, b"anon"), Some(102400));

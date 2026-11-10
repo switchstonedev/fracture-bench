@@ -68,9 +68,7 @@ impl HardwarePacer {
 
         let worker_thread = thread::Builder::new()
             .name("crucivec-pacer".to_string())
-            .spawn(move || {
-                run_pacer_loop(config, sender, running_clone, unserved_clone)
-            })
+            .spawn(move || run_pacer_loop(config, sender, running_clone, unserved_clone))
             .expect("Failed to spawn crucivec-pacer OS thread");
 
         Self {
@@ -123,7 +121,10 @@ fn run_pacer_loop(
     let clock = TscClock::new();
     let mut poisson = PoissonGenerator::new(config.target_qps, config.seed);
     let mut workload_gen = WorkloadGenerator::new(&config.workload, config.seed + 100);
-    let mut wal_writer = config.wal_path.as_ref().and_then(|p| WalWriter::open(p).ok());
+    let mut wal_writer = config
+        .wal_path
+        .as_ref()
+        .and_then(|p| WalWriter::open(p).ok());
     let mut current_lsn: u64 = 0;
 
     let mut jitter_hist = Histogram::<u64>::new_with_bounds(1, 1_000_000_000, 3)
@@ -150,7 +151,8 @@ fn run_pacer_loop(
                 QueryType::Upsert { id, vector } => {
                     current_lsn += 1;
                     if let Some(ref mut writer) = wal_writer {
-                        let _ = writer.append(current_lsn, elapsed_ns, *id, WalOpType::Upsert, vector);
+                        let _ =
+                            writer.append(current_lsn, elapsed_ns, *id, WalOpType::Upsert, vector);
                     }
                 }
                 QueryType::Delete { id } => {
@@ -219,7 +221,9 @@ mod tests {
         let rx = pacer.ticket_receiver();
 
         // Await first ticket to eliminate OS thread initialization latency
-        let _ = rx.recv_timeout(Duration::from_secs(2)).expect("Pacer failed to emit initial ticket");
+        let _ = rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("Pacer failed to emit initial ticket");
         let mut received = 1;
 
         let start = std::time::Instant::now();
@@ -236,14 +240,27 @@ mod tests {
         let p50 = hist.value_at_quantile(0.50);
         let p99 = hist.value_at_quantile(0.99);
 
-        println!("Test Pacer Complete: received={}, p50_jitter={}ns, p99_jitter={}ns", received, p50, p99);
-        assert!(received > 100, "Expected to receive at least 100 tickets in 50ms window, got {}", received);
+        println!(
+            "Test Pacer Complete: received={}, p50_jitter={}ns, p99_jitter={}ns",
+            received, p50, p99
+        );
+        assert!(
+            received > 100,
+            "Expected to receive at least 100 tickets in 50ms window, got {}",
+            received
+        );
     }
 
     #[test]
     fn test_hardware_pacer_wal_logging() {
         let temp_dir = std::env::temp_dir();
-        let wal_path = temp_dir.join(format!("test_pacer_wal_{}.bin", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let wal_path = temp_dir.join(format!(
+            "test_pacer_wal_{}.bin",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
 
         let config = PacerConfig {
             target_qps: 10_000.0,
@@ -259,10 +276,15 @@ mod tests {
         let rx = pacer.ticket_receiver();
 
         // Await initial ticket to eliminate thread initialization delay
-        let first_ticket = rx.recv_timeout(Duration::from_secs(2)).expect("Expected initial ticket");
+        let first_ticket = rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("Expected initial ticket");
         let mut received = 1;
         if first_ticket.lsn > 0 {
-            assert!(matches!(first_ticket.query_type, QueryType::Upsert { .. } | QueryType::Delete { .. } | QueryType::Search { .. }));
+            assert!(matches!(
+                first_ticket.query_type,
+                QueryType::Upsert { .. } | QueryType::Delete { .. } | QueryType::Search { .. }
+            ));
         }
 
         let start = std::time::Instant::now();
@@ -270,7 +292,12 @@ mod tests {
             if let Ok(ticket) = rx.recv_timeout(Duration::from_millis(10)) {
                 received += 1;
                 if ticket.lsn > 0 {
-                    assert!(matches!(ticket.query_type, QueryType::Upsert { .. } | QueryType::Delete { .. } | QueryType::Search { .. }));
+                    assert!(matches!(
+                        ticket.query_type,
+                        QueryType::Upsert { .. }
+                            | QueryType::Delete { .. }
+                            | QueryType::Search { .. }
+                    ));
                 }
             }
         }
@@ -279,9 +306,16 @@ mod tests {
         assert!(received > 0);
 
         // Verify WAL file exists and can be parsed
-        let mut reader = crucivec_core::wal::WalReader::open(&wal_path).expect("Failed to open written WAL");
-        let snapshot = reader.reconstruct_state(u64::MAX).expect("Failed to reconstruct WAL state");
-        println!("Pacer WAL Test: active vectors={}, tombstones={}", snapshot.active_vectors.len(), snapshot.tombstoned_ids.len());
+        let mut reader =
+            crucivec_core::wal::WalReader::open(&wal_path).expect("Failed to open written WAL");
+        let snapshot = reader
+            .reconstruct_state(u64::MAX)
+            .expect("Failed to reconstruct WAL state");
+        println!(
+            "Pacer WAL Test: active vectors={}, tombstones={}",
+            snapshot.active_vectors.len(),
+            snapshot.tombstoned_ids.len()
+        );
 
         let _ = std::fs::remove_file(wal_path);
     }

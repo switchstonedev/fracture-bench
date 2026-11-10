@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crucivec_adapters::VectorEngineAdapter;
+use crucivec_core::dataset::FvecsReader;
 use crucivec_core::simd::find_exact_top_k;
 use crucivec_core::types::DistanceMetric;
 use crucivec_core::wal::WalReader;
@@ -21,14 +22,22 @@ pub struct RecallVerificationReport {
     pub k: usize,
 }
 
-/// Loads query vectors from a JSON file (`[[f32, ...], ...]`) or binary file (`[u32 count, u32 dim, f32...]`).
+/// Loads query vectors from an `.fvecs`, JSON file (`[[f32, ...], ...]`), or binary file (`[u32 count, u32 dim, f32...]`).
 pub fn load_queries_from_file(path: impl AsRef<Path>) -> anyhow::Result<Vec<Vec<f32>>> {
     let path = path.as_ref();
+
+    // 1. Try .fvecs reader
+    if let Ok(queries) = FvecsReader::read_all(path) {
+        if !queries.is_empty() {
+            return Ok(queries);
+        }
+    }
+
     let mut file = File::open(path)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
 
-    // 1. Try JSON parsing
+    // 2. Try JSON parsing
     if let Ok(queries) = serde_json::from_slice::<Vec<Vec<f32>>>(&buffer) {
         if !queries.is_empty() {
             return Ok(queries);
@@ -86,7 +95,10 @@ pub fn verify_wal_recall(
     metric: DistanceMetric,
 ) -> anyhow::Result<RecallVerificationReport> {
     anyhow::ensure!(!queries.is_empty(), "Query list cannot be empty");
-    anyhow::ensure!(queries.len() == target_results.len(), "Queries and target results counts must match");
+    anyhow::ensure!(
+        queries.len() == target_results.len(),
+        "Queries and target results counts must match"
+    );
 
     let mut reader = WalReader::open(wal_path)?;
     let snapshot = reader.reconstruct_state(cutoff_lsn)?;
@@ -102,7 +114,11 @@ pub fn verify_wal_recall(
         let returned_ids: HashSet<u64> = target_top_k.iter().take(k).copied().collect();
         let hits = exact_ids.intersection(&returned_ids).count();
 
-        let recall = if k > 0 { (hits as f64) / (k as f64) } else { 0.0 };
+        let recall = if k > 0 {
+            (hits as f64) / (k as f64)
+        } else {
+            0.0
+        };
         total_recall += recall;
     }
 
@@ -143,20 +159,40 @@ mod tests {
     #[test]
     fn test_verify_wal_recall() {
         let temp_dir = std::env::temp_dir();
-        let wal_path = temp_dir.join(format!("test_verify_wal_{}.bin", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let wal_path = temp_dir.join(format!(
+            "test_verify_wal_{}.bin",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
 
         {
             let mut writer = WalWriter::open(&wal_path).unwrap();
-            writer.append(1, 1000, 10, WalOpType::Insert, &[1.0, 0.0, 0.0, 0.0]).unwrap();
-            writer.append(2, 2000, 20, WalOpType::Insert, &[0.0, 1.0, 0.0, 0.0]).unwrap();
-            writer.append(3, 3000, 30, WalOpType::Insert, &[0.9, 0.1, 0.0, 0.0]).unwrap();
+            writer
+                .append(1, 1000, 10, WalOpType::Insert, &[1.0, 0.0, 0.0, 0.0])
+                .unwrap();
+            writer
+                .append(2, 2000, 20, WalOpType::Insert, &[0.0, 1.0, 0.0, 0.0])
+                .unwrap();
+            writer
+                .append(3, 3000, 30, WalOpType::Insert, &[0.9, 0.1, 0.0, 0.0])
+                .unwrap();
             writer.flush().unwrap();
         }
 
         let queries = vec![vec![1.0, 0.0, 0.0, 0.0]];
         let target_results = vec![vec![10, 30]];
 
-        let report = verify_wal_recall(&wal_path, 3, &queries, &target_results, 2, DistanceMetric::Euclidean).unwrap();
+        let report = verify_wal_recall(
+            &wal_path,
+            3,
+            &queries,
+            &target_results,
+            2,
+            DistanceMetric::Euclidean,
+        )
+        .unwrap();
 
         assert_eq!(report.active_vectors_count, 3);
         assert_eq!(report.mean_recall_at_k, 1.0);

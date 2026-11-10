@@ -65,6 +65,10 @@ mod tests {
         let r1 = clock.raw_nanos();
         let delta = clock.delta_raw_nanos(r0, r1);
         println!("Raw delta for 5ms sleep: {} ns", delta);
-        assert!(delta >= 1_000_000, "5ms sleep delta should be at least 1ms (1_000_000 ns), got {}", delta);
+        assert!(
+            delta >= 1_000_000,
+            "5ms sleep delta should be at least 1ms (1_000_000 ns), got {}",
+            delta
+        );
     }
 }

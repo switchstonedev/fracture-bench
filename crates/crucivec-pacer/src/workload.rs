@@ -1,8 +1,8 @@
-use std::str::FromStr;
 use crucivec_core::types::{FilterPredicate, QueryType};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoroshiro128PlusPlus;
+use std::str::FromStr;
 
 /// Predefined or custom workload churn profiles.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

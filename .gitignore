@@ -63,4 +63,8 @@ data/
 # Local agent rules & maintainer taste
 .agents/rules/
 
+# Local benchmark execution runs & WALs
+runs/
+*.wal
+
 

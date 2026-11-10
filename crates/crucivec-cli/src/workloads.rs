@@ -25,9 +25,18 @@ mod tests {
         let upsert_pct = (upserts as f64) / total;
         let delete_pct = (deletes as f64) / total;
 
-        assert!((search_pct - 0.70).abs() < 0.03, "Search ratio should be ~70%");
-        assert!((upsert_pct - 0.20).abs() < 0.03, "Upsert ratio should be ~20%");
-        assert!((delete_pct - 0.10).abs() < 0.02, "Delete ratio should be ~10%");
+        assert!(
+            (search_pct - 0.70).abs() < 0.03,
+            "Search ratio should be ~70%"
+        );
+        assert!(
+            (upsert_pct - 0.20).abs() < 0.03,
+            "Upsert ratio should be ~20%"
+        );
+        assert!(
+            (delete_pct - 0.10).abs() < 0.02,
+            "Delete ratio should be ~10%"
+        );
 
         let vec = gen.generate_vector();
         assert_eq!(vec.len(), 128);

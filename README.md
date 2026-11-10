@@ -86,6 +86,16 @@ CruciVec isolates load generation, target execution, kernel telemetry, and mathe
 cargo build --release
 ```
 
+### Pre-populate Corpus (Bulk Ingestion)
+```bash
+./target/release/crucivec seed \
+    --target qdrant \
+    --count 100000 \
+    --dimension 128 \
+    --batch-size 500 \
+    --wal-path ./runs/qdrant_seed.wal
+```
+
 ### Run an Open-Loop Benchmark
 ```bash
 ./target/release/crucivec run \

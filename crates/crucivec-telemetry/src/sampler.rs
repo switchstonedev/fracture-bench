@@ -78,8 +78,14 @@ impl TelemetrySampler {
                 initial_stats: first.stats,
                 final_stats: last.stats,
                 net_pgmajfault: last.stats.pgmajfault.saturating_sub(first.stats.pgmajfault),
-                net_workingset_refault: last.stats.workingset_refault.saturating_sub(first.stats.workingset_refault),
-                net_throttled_usec: last.stats.throttled_usec.saturating_sub(first.stats.throttled_usec),
+                net_workingset_refault: last
+                    .stats
+                    .workingset_refault
+                    .saturating_sub(first.stats.workingset_refault),
+                net_throttled_usec: last
+                    .stats
+                    .throttled_usec
+                    .saturating_sub(first.stats.throttled_usec),
             }
         } else {
             TelemetrySummary::default()
@@ -95,11 +101,15 @@ mod tests {
 
     #[test]
     fn test_telemetry_sampler_lifecycle() {
-        let sampler = TelemetrySampler::spawn(PathBuf::from("."), Duration::from_millis(5)).unwrap();
+        let sampler =
+            TelemetrySampler::spawn(PathBuf::from("."), Duration::from_millis(5)).unwrap();
         thread::sleep(Duration::from_millis(30));
         let (samples, summary) = sampler.stop();
 
-        assert!(!samples.is_empty(), "Sampler should have captured at least one sample");
+        assert!(
+            !samples.is_empty(),
+            "Sampler should have captured at least one sample"
+        );
         assert!(summary.total_samples > 0);
     }
 }

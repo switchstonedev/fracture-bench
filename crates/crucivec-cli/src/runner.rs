@@ -49,6 +49,7 @@ impl BenchmarkRunner {
         running: Arc<AtomicBool>,
         duration: Duration,
         unserved_arrivals: u64,
+        dataset_queries: Option<Arc<Vec<Vec<f32>>>>,
     ) -> BenchmarkReport {
         let mut handles: Vec<JoinHandle<WorkerMetrics>> = Vec::with_capacity(self.workers);
 
@@ -57,12 +58,16 @@ impl BenchmarkRunner {
             let adapter_clone = Arc::clone(&adapter);
             let running_clone = Arc::clone(&running);
             let dimension = self.dimension;
+            let queries_clone = dataset_queries.clone();
 
             let handle = tokio::spawn(async move {
-                let mut service_hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
-                let mut total_hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+                let mut service_hist =
+                    Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+                let mut total_hist =
+                    Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
                 let mut completed = 0;
-                let mut workload = WorkloadGenerator::new_churn_70_20_10(dimension, 1000 + worker_id as u64);
+                let mut workload =
+                    WorkloadGenerator::new_churn_70_20_10(dimension, 1000 + worker_id as u64);
 
                 let run_epoch = Instant::now();
 
@@ -78,8 +83,19 @@ impl BenchmarkRunner {
                     // Execute request against target database adapter
                     match ticket.query_type {
                         QueryType::Search { k, filter } => {
-                            let query_vec = workload.generate_vector();
-                            let _ = adapter_clone.search(&query_vec, k, filter.as_ref()).await;
+                            if let Some(ref qs) = queries_clone {
+                                if !qs.is_empty() {
+                                    let q = &qs[(completed as usize) % qs.len()];
+                                    let _ = adapter_clone.search(q, k, filter.as_ref()).await;
+                                } else {
+                                    let query_vec = workload.generate_vector();
+                                    let _ =
+                                        adapter_clone.search(&query_vec, k, filter.as_ref()).await;
+                                }
+                            } else {
+                                let query_vec = workload.generate_vector();
+                                let _ = adapter_clone.search(&query_vec, k, filter.as_ref()).await;
+                            }
                         }
                         QueryType::Upsert { id, vector } => {
                             let _ = adapter_clone.upsert(id, &vector).await;
@@ -94,7 +110,9 @@ impl BenchmarkRunner {
 
                     // Total response time accounts for client queue delay from scheduled emission
                     let actual_recv_ns = run_epoch.elapsed().as_nanos() as u64;
-                    let total_response_time_ns = actual_recv_ns.saturating_sub(intended_emit_ns).max(service_time_ns);
+                    let total_response_time_ns = actual_recv_ns
+                        .saturating_sub(intended_emit_ns)
+                        .max(service_time_ns);
 
                     let _ = service_hist.record(service_time_ns.max(1));
                     let _ = total_hist.record(total_response_time_ns.max(1));
@@ -112,8 +130,10 @@ impl BenchmarkRunner {
         running.store(false, Ordering::Release);
 
         // Collect and merge worker histograms
-        let mut global_service_hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
-        let mut global_total_hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+        let mut global_service_hist =
+            Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+        let mut global_total_hist =
+            Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
         let mut total_completed = 0;
 
         for h in handles {
@@ -143,4 +163,3 @@ impl BenchmarkRunner {
         }
     }
 }
-
