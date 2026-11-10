@@ -87,6 +87,10 @@ enum Commands {
         /// Perform dry-run validation without issuing load or running pacing loops
         #[arg(long)]
         dry_run: bool,
+
+        /// Run in closed-loop concurrency-bound mode (exposes the Tail Latency Illusion)
+        #[arg(long)]
+        closed_loop: bool,
     },
 
     /// Pre-populate target vector engine with initial corpus (bulk ingestion)
@@ -153,10 +157,6 @@ enum Commands {
         /// Optional path to export JSON recall verification report
         #[arg(short, long)]
         output: Option<PathBuf>,
-
-        /// Perform dry-run validation without issuing k-NN evaluation
-        #[arg(long)]
-        dry_run: bool,
     },
 
     /// Profile target cgroup v2 kernel telemetry in real-time
@@ -231,18 +231,29 @@ async fn main() -> anyhow::Result<()> {
             k,
             dataset,
             dry_run,
+            closed_loop,
         } => {
             println!("===========================================================");
-            println!("  CruciVec: Running Open-Loop Hardware-Paced Benchmark     ");
+            if closed_loop {
+                println!("  CruciVec: Running Closed-Loop Concurrency-Bound Benchmark");
+            } else {
+                println!("  CruciVec: Running Open-Loop Hardware-Paced Benchmark     ");
+            }
             println!("===========================================================");
             println!("Target Engine : {}", target);
-            println!("Target QPS    : {}", qps);
+            if closed_loop {
+                println!("Dispatch Mode : Closed-Loop (synchronous request-response)");
+            } else {
+                println!("Target QPS    : {}", qps);
+            }
             println!("Duration      : {}s", duration_sec);
             println!("Workers       : {}", workers);
             println!("Vector Dim    : {}", dimension);
             println!("Workload      : {}", workload);
             if dry_run {
                 println!("Execution Mode: Dry Run (zero load, validation only)");
+            } else if closed_loop {
+                println!("Execution Mode: Closed-Loop (Tail Latency Illusion active)");
             }
             if let Some(ref d) = dataset {
                 println!("Query Dataset : {:?}", d);
@@ -327,54 +338,67 @@ async fn main() -> anyhow::Result<()> {
                 None
             };
 
-            let w_type: WorkloadType = workload.parse().unwrap_or(WorkloadType::Churn70_20_10);
-            let w_config = WorkloadConfig::new(w_type, dimension, k);
-
-            // 1. Launch Hardware Pacer
-            let pacer_config = PacerConfig {
-                target_qps: qps,
-                channel_capacity: 65_536,
-                pinned_core_id: None, // Pin on bare metal runs
-                seed: 42,
-                hybrid_sleep_threshold_us: 100,
-                workload: w_config,
-                wal_path,
-            };
-            let pacer = HardwarePacer::spawn(pacer_config);
-            let rx = pacer.ticket_receiver();
-
-            // 2. Launch Background Telemetry Sampler if cgroup path provided
+            // Launch Background Telemetry Sampler if cgroup path provided
             let sampler = if let Some(path) = cgroup_path {
                 TelemetrySampler::spawn(path, Duration::from_millis(50)).ok()
             } else {
                 None
             };
 
-            // 3. Launch Async Worker Pool
             let running = Arc::new(AtomicBool::new(true));
             let runner = BenchmarkRunner::new(workers, dimension);
-            let report = runner
-                .run(
-                    rx,
-                    adapter,
-                    running,
-                    Duration::from_secs(duration_sec),
-                    pacer.unserved_arrivals(),
-                    query_vectors,
-                )
-                .await;
 
-            let jitter_hist = pacer.stop();
+            let (report, pacer_p99_jitter) = if closed_loop {
+                let rpt = runner
+                    .run_closed_loop(
+                        adapter,
+                        running,
+                        Duration::from_secs(duration_sec),
+                        query_vectors,
+                        k,
+                    )
+                    .await;
+                (rpt, 0.0)
+            } else {
+                let w_type: WorkloadType = workload.parse().unwrap_or(WorkloadType::Churn70_20_10);
+                let w_config = WorkloadConfig::new(w_type, dimension, k);
+
+                let pacer_config = PacerConfig {
+                    target_qps: qps,
+                    channel_capacity: 65_536,
+                    pinned_core_id: None, // Pin on bare metal runs
+                    seed: 42,
+                    hybrid_sleep_threshold_us: 100,
+                    workload: w_config,
+                    wal_path,
+                };
+                let pacer = HardwarePacer::spawn(pacer_config);
+                let rx = pacer.ticket_receiver();
+
+                let rpt = runner
+                    .run(
+                        rx,
+                        adapter,
+                        running,
+                        Duration::from_secs(duration_sec),
+                        pacer.unserved_arrivals(),
+                        query_vectors,
+                    )
+                    .await;
+
+                let jitter_hist = pacer.stop();
+                let p99 = jitter_hist
+                    .as_ref()
+                    .map(|h| h.value_at_quantile(0.99) as f64 / 1000.0)
+                    .unwrap_or(0.0);
+                (rpt, p99)
+            };
+
             let (_samples, telemetry_summary) = if let Some(s) = sampler {
                 s.stop()
             } else {
                 (Vec::new(), Default::default())
             };
-
-            let pacer_p99_jitter = jitter_hist
-                .as_ref()
-                .map(|h| h.value_at_quantile(0.99) as f64 / 1000.0)
-                .unwrap_or(0.0);
 
             println!("\n================ Benchmark Results ================");
             println!("Completed Operations: {}", report.total_completed);
@@ -583,7 +607,6 @@ async fn main() -> anyhow::Result<()> {
             target,
             endpoint,
             output,
-            dry_run,
         } => {
             println!("===========================================================");
             println!("  CruciVec: Replaying Binary WAL for Point-in-Time Ground Truth ");
@@ -591,35 +614,8 @@ async fn main() -> anyhow::Result<()> {
             println!("WAL File   : {:?}", wal_path);
             println!("Cutoff LSN : {}", cutoff_lsn);
             println!("K          : {}", k);
-            if dry_run {
-                println!("Execution Mode: Dry Run (zero load, validation only)");
-            }
 
             let mut reader = WalReader::open(&wal_path)?;
-            if dry_run {
-                println!(
-                    "[Dry Run] Successfully opened and validated WAL file {:?}",
-                    wal_path
-                );
-                if let Some(out_path) = output {
-                    if let Some(parent) = out_path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    let report = verify::RecallVerificationReport {
-                        cutoff_lsn,
-                        active_vectors_count: 0,
-                        tombstone_count: 0,
-                        evaluated_queries: 0,
-                        k,
-                        mean_recall_at_k: 0.0,
-                    };
-                    let mut f = File::create(&out_path)?;
-                    f.write_all(serde_json::to_string_pretty(&report)?.as_bytes())?;
-                    println!("Exported verification JSON -> {:?}", out_path);
-                }
-                println!("[Dry Run] Complete: WAL header valid.");
-                return Ok(());
-            }
             let snapshot = reader.reconstruct_state(cutoff_lsn)?;
             println!("Active Vectors : {}", snapshot.active_vectors.len());
             println!("Tombstone Count: {}", snapshot.tombstoned_ids.len());

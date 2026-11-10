@@ -162,4 +162,116 @@ impl BenchmarkRunner {
             total_time_p999_us: (global_total_hist.value_at_quantile(0.999) as f64) / 1000.0,
         }
     }
+
+    /// Executes closed-loop benchmark run where workers issue queries in back-to-back loops.
+    /// In closed-loop systems, client wait time is masked to zero (Tail Latency Illusion).
+    pub async fn run_closed_loop(
+        &self,
+        adapter: Arc<dyn VectorEngineAdapter>,
+        running: Arc<AtomicBool>,
+        duration: Duration,
+        query_vectors: Option<Arc<Vec<Vec<f32>>>>,
+        k: usize,
+    ) -> BenchmarkReport {
+        let mut handles: Vec<JoinHandle<WorkerMetrics>> = Vec::with_capacity(self.workers);
+
+        for worker_id in 0..self.workers {
+            let adapter_clone = Arc::clone(&adapter);
+            let running_clone = Arc::clone(&running);
+            let dimension = self.dimension;
+            let queries_clone = query_vectors.clone();
+
+            let handle = tokio::spawn(async move {
+                let mut service_hist =
+                    Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+                let mut total_hist =
+                    Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+                let mut completed = 0;
+                let mut workload =
+                    WorkloadGenerator::new_churn_70_20_10(dimension, 2000 + worker_id as u64);
+
+                while running_clone.load(Ordering::Relaxed) {
+                    let op = workload.next_op();
+                    let t_sent = Instant::now();
+
+                    match op {
+                        QueryType::Search { k: query_k, filter } => {
+                            let eff_k = if k > 0 { k } else { query_k };
+                            if let Some(ref qs) = queries_clone {
+                                if !qs.is_empty() {
+                                    let q = &qs[(completed as usize) % qs.len()];
+                                    let _ = adapter_clone.search(q, eff_k, filter.as_ref()).await;
+                                } else {
+                                    let query_vec = workload.generate_vector();
+                                    let _ = adapter_clone
+                                        .search(&query_vec, eff_k, filter.as_ref())
+                                        .await;
+                                }
+                            } else {
+                                let query_vec = workload.generate_vector();
+                                let _ = adapter_clone
+                                    .search(&query_vec, eff_k, filter.as_ref())
+                                    .await;
+                            }
+                        }
+                        QueryType::Upsert { id, vector } => {
+                            let _ = adapter_clone.upsert(id, &vector).await;
+                        }
+                        QueryType::Delete { id } => {
+                            let _ = adapter_clone.delete(id).await;
+                        }
+                    }
+
+                    let t_recv = Instant::now();
+                    let service_time_ns = t_recv.duration_since(t_sent).as_nanos() as u64;
+
+                    // In closed-loop systems, queue wait time is artificially zero
+                    let total_response_time_ns = service_time_ns;
+
+                    let _ = service_hist.record(service_time_ns.max(1));
+                    let _ = total_hist.record(total_response_time_ns.max(1));
+                    completed += 1;
+                }
+
+                (service_hist, total_hist, completed)
+            });
+
+            handles.push(handle);
+        }
+
+        tokio::time::sleep(duration).await;
+        running.store(false, Ordering::Release);
+
+        let mut global_service_hist =
+            Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+        let mut global_total_hist =
+            Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+        let mut total_completed = 0;
+
+        for h in handles {
+            if let Ok((s_hist, t_hist, count)) = h.await {
+                global_service_hist.add(&s_hist).unwrap();
+                global_total_hist.add(&t_hist).unwrap();
+                total_completed += count;
+            }
+        }
+
+        let dur_sec = duration.as_secs_f64();
+        let achieved_qps = (total_completed as f64) / dur_sec;
+
+        BenchmarkReport {
+            duration_sec: dur_sec,
+            total_completed,
+            unserved_arrivals: 0,
+            achieved_qps,
+            service_time_p50_us: (global_service_hist.value_at_quantile(0.50) as f64) / 1000.0,
+            service_time_p90_us: (global_service_hist.value_at_quantile(0.90) as f64) / 1000.0,
+            service_time_p99_us: (global_service_hist.value_at_quantile(0.99) as f64) / 1000.0,
+            service_time_p999_us: (global_service_hist.value_at_quantile(0.999) as f64) / 1000.0,
+            total_time_p50_us: (global_total_hist.value_at_quantile(0.50) as f64) / 1000.0,
+            total_time_p90_us: (global_total_hist.value_at_quantile(0.90) as f64) / 1000.0,
+            total_time_p99_us: (global_total_hist.value_at_quantile(0.99) as f64) / 1000.0,
+            total_time_p999_us: (global_total_hist.value_at_quantile(0.999) as f64) / 1000.0,
+        }
+    }
 }
