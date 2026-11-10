@@ -54,10 +54,10 @@ flowchart TD
 CruciVec isolates load generation, target execution, kernel telemetry, and mathematical scoring into independent subsystems to eliminate measurement perturbation:
 
 *   **`crucivec-pacer`:** High-precision arrival scheduler running on an isolated, pinned CPU core. Uses hardware Timestamp Counter (`quanta`) to drive Poisson arrivals with sub-microsecond jitter at 50,000 QPS.
-*   **`crucivec-core`:** Domain types, 32-byte naturally aligned binary Write-Ahead Log (WAL), and AVX2/NEON SIMD linear-scan $k$-NN kernels for decoupled ground-truth calculation.
+*   **`crucivec-core`:** Domain types, 32-byte naturally aligned binary Write-Ahead Log (WAL), dataset readers (.fvecs, .bvecs), and AVX2/NEON SIMD linear-scan k-NN kernels for decoupled ground-truth calculation.
 *   **`crucivec-telemetry`:** Zero-allocation Linux `/sys/fs/cgroup` parser sampling page faults, workingset refaults, and CFS CPU throttling in under 2 µs per sample using persistent file descriptors.
-*   **`crucivec-adapters`:** Unified client trait implementations for Qdrant (gRPC), pgvector (tokio-postgres), Milvus, and LanceDB (isolated).
-*   **`crucivec-cli`:** Main executable binary with `run`, `verify`, and `profile` subcommands.
+*   **`crucivec-adapters`:** Unified client trait implementations for Qdrant (gRPC/HTTP), pgvector (SQL with trust auth), Milvus, and LanceDB.
+*   **`crucivec-cli`:** Main executable binary with `run`, `seed`, `verify`, and `profile` subcommands.
 
 ---
 
@@ -65,13 +65,19 @@ CruciVec isolates load generation, target execution, kernel telemetry, and mathe
 
 1. **Elimination of Coordinated Omission:**
    CruciVec tracks dual histograms per worker task:
-   *   `service_time`: Network round-trip duration ($t_{\text{recv}} - t_{\text{sent}}$).
-   *   `total_response_time`: True end-to-end latency including client queue delay ($t_{\text{recv}} - t_{\text{intended}}$).
+   *   `service_time`: Network round-trip duration (t_recv - t_sent).
+   *   `total_response_time`: True end-to-end latency including client queue delay (t_recv - t_intended).
 2. **Deterministic Point-in-Time Ground Truth:**
    Ground truth is never evaluated against mutable live state. Mutations are appended to an immutable binary WAL with monotonic Log Sequence Numbers (LSNs). Queries record their observed commit boundary, and ground-truth nearest neighbors are reconstructed post-hoc.
 3. **Decoupled Ground-Truth Computation:**
    Brute-force SIMD scans are executed offline to prevent memory bus and cache pollution during the live benchmark run.
-4. **Stratified Modulo Selectivity:**
+4. **Three-Tier Reproduction Hierarchy (ACM/IEEE Badging Standards):**
+   *   **Level 1 — Dry Run (`--tier dry_run` / `--dry-run`):** 10-30s wiring and environment sanity check with zero compute load.
+   *   **Level 2 — Sample / Pilot (`--tier sample` / `--sample`):** 1-3 min pilot run on accessible engines yielding initial ground-truth metrics without resource lockup.
+   *   **Level 3 — Full Benchmark (`--tier full` / `--full`):** Complete QPS sweeps across all engines when dedicated compute infrastructure is available.
+5. **Standardized Research Placeholder Policy:**
+   Any unexecuted or unreachable engine metric is recorded strictly as `{metric_originTech}` (e.g. `{achievedQps_milvus}`, `{recall10_pgvector}`). Fabricated numbers are strictly forbidden.
+6. **Stratified Modulo Selectivity:**
    Metadata filter queries are partitioned into three calibrated cohorts:
    *   High Selectivity: ~60% match rate (`id % 10 in [0..5]`).
    *   Medium Selectivity: ~10% match rate (`id % 10 == 0`).
@@ -84,6 +90,18 @@ CruciVec isolates load generation, target execution, kernel telemetry, and mathe
 ### Build CruciVec
 ```bash
 cargo build --release
+```
+
+### Single-Entrypoint Reproduction Harness
+```bash
+# Dry run: ultra-fast validation (< 30s)
+python scripts/reproduce.py --tier dry_run
+
+# Sample run: 1-3 min pilot evaluation on accessible engines
+python scripts/reproduce.py --tier sample
+
+# Full matrix sweep (for dedicated compute environments)
+python scripts/reproduce.py --tier full
 ```
 
 ### Pre-populate Corpus (Bulk Ingestion)
@@ -102,15 +120,17 @@ cargo build --release
     --target qdrant \
     --qps 10000 \
     --workload churn-70-20-10 \
-    --dataset cohere-1m
+    --duration-sec 5
 ```
 
 ### Replay WAL for Offline Recall@K Verification
 ```bash
 ./target/release/crucivec verify \
-    --wal-path ./runs/qdrant_churn.wal \
-    --queries ./data/cohere_queries.bin \
-    --k 10
+    --wal-path ./runs/qdrant_seed.wal \
+    --cutoff-lsn 1000 \
+    --k 10 \
+    --target qdrant \
+    --output ./results/qdrant_recall.json
 ```
 
 ---

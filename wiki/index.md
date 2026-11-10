@@ -16,3 +16,4 @@ Central repository memory and architectural decision records for the CruciVec ve
 - Architecture Decision Records:
   - Initial Setup: [[wiki/adr/001-initial-architecture]] (relates_to)
   - Open-Loop WAL Architecture: [[wiki/adr/002-open-loop-wal-architecture]] (relates_to)
+  - Three-Tier Benchmark Evaluation: [[wiki/adr/003-three-tier-evaluation-and-reproduction]] (relates_to)
