@@ -16,7 +16,10 @@ pub enum WalError {
     #[error("Vector byte slice length {actual} is not a multiple of 4 (f32 alignment)")]
     UnalignedVectorBytes { actual: usize },
     #[error("LSN out of order: expected monotonic increase from {current_lsn}, encountered {encountered_lsn}")]
-    NonMonotonicLsn { current_lsn: u64, encountered_lsn: u64 },
+    NonMonotonicLsn {
+        current_lsn: u64,
+        encountered_lsn: u64,
+    },
 }
 
 /// Operation type indicator within the WAL header.
@@ -151,7 +154,10 @@ impl WalReader {
     }
 
     /// Replays mutations up to a specified cutoff LSN, rolling forward inserts and subtracting tombstones.
-    pub fn reconstruct_state(&mut self, cutoff_lsn: u64) -> Result<ActiveDatasetSnapshot, WalError> {
+    pub fn reconstruct_state(
+        &mut self,
+        cutoff_lsn: u64,
+    ) -> Result<ActiveDatasetSnapshot, WalError> {
         self.reader.seek(SeekFrom::Start(0))?;
 
         let mut snapshot = ActiveDatasetSnapshot {
@@ -177,7 +183,9 @@ impl WalReader {
             match op {
                 WalOpType::Insert | WalOpType::Upsert => {
                     if !payload_len.is_multiple_of(4) {
-                        return Err(WalError::UnalignedVectorBytes { actual: payload_len });
+                        return Err(WalError::UnalignedVectorBytes {
+                            actual: payload_len,
+                        });
                     }
                     let floats: &[f32] = cast_slice(&vector_buf);
                     snapshot.active_vectors.insert(header.id, floats.to_vec());
@@ -206,14 +214,26 @@ mod tests {
     #[test]
     fn test_wal_roundtrip_and_point_in_time_reconstruction() {
         let temp_dir = std::env::temp_dir();
-        let wal_path = temp_dir.join(format!("test_wal_{}.bin", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let wal_path = temp_dir.join(format!(
+            "test_wal_{}.bin",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
 
         {
             let mut writer = WalWriter::open(&wal_path).expect("Failed to open WAL writer");
-            writer.append(1, 1000, 42, WalOpType::Insert, &[1.0, 2.0, 3.0, 4.0]).unwrap();
-            writer.append(2, 2000, 99, WalOpType::Insert, &[0.1, 0.2, 0.3, 0.4]).unwrap();
+            writer
+                .append(1, 1000, 42, WalOpType::Insert, &[1.0, 2.0, 3.0, 4.0])
+                .unwrap();
+            writer
+                .append(2, 2000, 99, WalOpType::Insert, &[0.1, 0.2, 0.3, 0.4])
+                .unwrap();
             writer.append(3, 3000, 42, WalOpType::Delete, &[]).unwrap();
-            writer.append(4, 4000, 105, WalOpType::Insert, &[5.0, 6.0, 7.0, 8.0]).unwrap();
+            writer
+                .append(4, 4000, 105, WalOpType::Insert, &[5.0, 6.0, 7.0, 8.0])
+                .unwrap();
             writer.flush().unwrap();
         }
 
@@ -241,4 +261,3 @@ mod tests {
         let _ = std::fs::remove_file(wal_path);
     }
 }
-

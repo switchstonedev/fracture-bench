@@ -1,9 +1,9 @@
 pub mod avx2;
 pub mod neon;
 
-use std::cmp::Ordering;
-use rayon::prelude::*;
 use crate::types::DistanceMetric;
+use rayon::prelude::*;
+use std::cmp::Ordering;
 
 /// Computes the dot product between two f32 vectors with dynamic CPU feature dispatch.
 pub fn dot_product(a: &[f32], b: &[f32]) -> f32 {
@@ -72,9 +72,7 @@ pub fn find_exact_top_k(
 
     // Partial sort or full sort to extract top-K smallest distances
     if scored.len() > k {
-        scored.select_nth_unstable_by(k, |a, b| {
-            a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal)
-        });
+        scored.select_nth_unstable_by(k, |a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
         scored.truncate(k);
     }
 
@@ -93,11 +91,17 @@ mod tests {
 
         let dot_scalar = neon::dot_product_scalar(&v1, &v2);
         let dot_dispatch = dot_product(&v1, &v2);
-        assert!((dot_scalar - dot_dispatch).abs() < 1e-4, "Scalar and SIMD dot products must match within epsilon");
+        assert!(
+            (dot_scalar - dot_dispatch).abs() < 1e-4,
+            "Scalar and SIMD dot products must match within epsilon"
+        );
 
         let l2_scalar = neon::euclidean_distance_sq_scalar(&v1, &v2);
         let l2_dispatch = euclidean_distance_sq(&v1, &v2);
-        assert!((l2_scalar - l2_dispatch).abs() < 1e-4, "Scalar and SIMD L2 distances must match within epsilon");
+        assert!(
+            (l2_scalar - l2_dispatch).abs() < 1e-4,
+            "Scalar and SIMD L2 distances must match within epsilon"
+        );
     }
 
     #[test]
@@ -115,4 +119,3 @@ mod tests {
         assert_eq!(top[1].0, 3);
     }
 }
-

@@ -100,4 +100,3 @@ pub unsafe fn euclidean_distance_sq_avx2(a: &[f32], b: &[f32]) -> f32 {
 
     result
 }
-

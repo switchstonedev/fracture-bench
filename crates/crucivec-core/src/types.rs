@@ -9,14 +9,9 @@ pub enum QueryType {
         filter: Option<FilterPredicate>,
     },
     /// Insertion or replacement of a vector embedding with an assigned document ID and embedding data.
-    Upsert {
-        id: u64,
-        vector: Vec<f32>,
-    },
+    Upsert { id: u64, vector: Vec<f32> },
     /// Hard removal of a vector embedding by ID (HNSW tombstone generation).
-    Delete {
-        id: u64,
-    },
+    Delete { id: u64 },
 }
 
 /// Stratified modulo filter predicate used to calibrate selectivity cohorts.
@@ -28,15 +23,9 @@ pub enum FilterPredicate {
         allowed_remainders: Vec<u64>,
     },
     /// Medium selectivity cohort (~10% pass rate: `id % 10 == 0`).
-    Medium {
-        modulo: u64,
-        target_remainder: u64,
-    },
+    Medium { modulo: u64, target_remainder: u64 },
     /// Needle-in-a-haystack cohort (~0.1% pass rate: `id % 1000 == 42`).
-    Needle {
-        modulo: u64,
-        target_remainder: u64,
-    },
+    Needle { modulo: u64, target_remainder: u64 },
 }
 
 impl FilterPredicate {
@@ -44,12 +33,21 @@ impl FilterPredicate {
     #[inline(always)]
     pub fn matches(&self, id: u64) -> bool {
         match self {
-            Self::High { modulo, allowed_remainders } => {
+            Self::High {
+                modulo,
+                allowed_remainders,
+            } => {
                 let rem = id % modulo;
                 allowed_remainders.contains(&rem)
             }
-            Self::Medium { modulo, target_remainder } => (id % modulo) == *target_remainder,
-            Self::Needle { modulo, target_remainder } => (id % modulo) == *target_remainder,
+            Self::Medium {
+                modulo,
+                target_remainder,
+            } => (id % modulo) == *target_remainder,
+            Self::Needle {
+                modulo,
+                target_remainder,
+            } => (id % modulo) == *target_remainder,
         }
     }
 }
@@ -90,4 +88,3 @@ pub struct VectorRecord {
     pub vector: Vec<f32>,
     pub lsn: u64,
 }
-

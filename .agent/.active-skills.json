@@ -6,6 +6,7 @@
                           "arch/readme-craft",
                           "langs/memory-safety",
                           "langs/rust-systems",
-                          "langs/rust-native-extensions"
+                          "langs/rust-native-extensions",
+                          "ops/cicd-pipeline"
                       ]
 }
