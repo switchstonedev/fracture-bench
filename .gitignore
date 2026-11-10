@@ -65,6 +65,8 @@ data/
 
 # Local benchmark execution runs & WALs
 runs/
+results/*
+!results/.gitkeep
 *.wal
 
 
