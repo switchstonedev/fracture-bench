@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::sync::RwLock;
 
 use async_trait::async_trait;
-use crucivec_core::simd::{cosine_distance, dot_product, euclidean_distance_sq};
-use crucivec_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
+use fracture_core::simd::{cosine_distance, dot_product, euclidean_distance_sq};
+use fracture_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
 use serde::{Deserialize, Serialize};
 
 use crate::VectorEngineAdapter;

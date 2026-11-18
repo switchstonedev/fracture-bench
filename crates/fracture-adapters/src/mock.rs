@@ -4,8 +4,8 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use crucivec_core::simd::{dot_product, euclidean_distance_sq};
-use crucivec_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
+use fracture_core::simd::{dot_product, euclidean_distance_sq};
+use fracture_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
 
 use crate::VectorEngineAdapter;
 

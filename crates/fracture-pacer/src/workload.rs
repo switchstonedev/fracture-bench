@@ -1,4 +1,4 @@
-use crucivec_core::types::{FilterPredicate, QueryType};
+use fracture_core::types::{FilterPredicate, QueryType};
 use rand::Rng;
 use rand_xoshiro::rand_core::SeedableRng;
 use rand_xoshiro::Xoroshiro128PlusPlus;

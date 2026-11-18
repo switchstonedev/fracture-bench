@@ -1,9 +1,9 @@
-pub use crucivec_pacer::workload::*;
+pub use fracture_pacer::workload::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crucivec_core::types::QueryType;
+    use fracture_core::types::QueryType;
 
     #[test]
     fn test_workload_ratios_and_vector_sanitization() {

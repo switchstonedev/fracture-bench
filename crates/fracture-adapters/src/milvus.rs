@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crucivec_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
+use fracture_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
 use serde::{Deserialize, Serialize};
 
 use crate::http_client::SimpleHttpClient;
@@ -16,7 +16,7 @@ impl Default for MilvusConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://127.0.0.1:19530".to_string(),
-            collection_name: "crucivec_milvus".to_string(),
+            collection_name: "fracture_milvus".to_string(),
         }
     }
 }

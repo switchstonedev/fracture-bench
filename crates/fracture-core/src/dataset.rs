@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn test_fvecs_roundtrip() {
         let temp_dir = std::env::temp_dir();
-        let file_path = temp_dir.join("test_crucivec.fvecs");
+        let file_path = temp_dir.join("test_fracture.fvecs");
 
         let mut synth = SyntheticDataset::new(128, 42);
         let sample_vectors = synth.generate_batch(20);

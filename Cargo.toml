@@ -1,27 +1,27 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/crucivec-core",
-    "crates/crucivec-pacer",
-    "crates/crucivec-telemetry",
-    "crates/crucivec-adapters",
-    "crates/crucivec-cli",
+    "crates/fracture-core",
+    "crates/fracture-pacer",
+    "crates/fracture-telemetry",
+    "crates/fracture-adapters",
+    "crates/fracture-cli",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Mrigank Bhatnagar <mrigankbhatnagar06@gmail.com>"]
+authors = ["Mrigank Bhatnagar <mrigankbhatnagar06@gmail.com>", "SwitchStone"]
 license = "Apache-2.0"
-repository = "https://github.com/Awesome06/crucivec"
+repository = "https://github.com/switchstonedev/fracture-bench"
 readme = "README.md"
 
 [workspace.dependencies]
 # Internal crates
-crucivec-core = { path = "crates/crucivec-core" }
-crucivec-pacer = { path = "crates/crucivec-pacer" }
-crucivec-telemetry = { path = "crates/crucivec-telemetry" }
-crucivec-adapters = { path = "crates/crucivec-adapters" }
+fracture-core = { path = "crates/fracture-core" }
+fracture-pacer = { path = "crates/fracture-pacer" }
+fracture-telemetry = { path = "crates/fracture-telemetry" }
+fracture-adapters = { path = "crates/fracture-adapters" }
 
 # High-precision timing & concurrency
 quanta = "0.12"

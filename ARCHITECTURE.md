@@ -1,4 +1,4 @@
-# CruciVec: Systems Architecture, Hardware Pacing & Error Bounds
+# Fracture: Systems Architecture, Hardware Pacing & Error Bounds
 
 ## 1. Mathematical Foundation: Open-Loop Poisson Pacing
 
@@ -8,7 +8,7 @@ latency_closed = t_recv - t_sent
 ```
 where each client worker blocks until receiving a response before scheduling the subsequent query. When the target vector engine suffers an internal stop-the-world event (such as HNSW segment merging, garbage collection, or inverted index vacuuming), the closed-loop generator stalls synchronously. Consequently, zero requests are issued during the outage window, masking catastrophic queuing degradation.
 
-CruciVec eliminates Coordinated Omission by executing an independent, core-pinned timing thread driven by an open-loop Poisson arrival process.
+Fracture eliminates Coordinated Omission by executing an independent, core-pinned timing thread driven by an open-loop Poisson arrival process.
 
 ### 1.1 Inverse-CDF Inter-Arrival Sampling
 Inter-arrival intervals Delta_t follow an exponential distribution governed by arrival rate lambda (target QPS):
@@ -22,7 +22,7 @@ Delta_t = -ln(U) / lambda
 where U is drawn uniformly from (0.0, 1.0] using an inline `Xoroshiro128PlusPlus` pseudo-random number generator (1.2 ns per sample, zero heap allocation).
 
 ### 1.2 Dual-Histogram Latency Decomposition
-For every query i with planned schedule timestamp t_intended(i) and network socket issue timestamp t_sent(i), CruciVec records two orthogonal metrics:
+For every query i with planned schedule timestamp t_intended(i) and network socket issue timestamp t_sent(i), Fracture records two orthogonal metrics:
 
 1. **Network Service Time:**
    ```text
@@ -43,7 +43,7 @@ For every query i with planned schedule timestamp t_intended(i) and network sock
 Cooperative asynchronous timers (such as `tokio::time::sleep`) rely on OS timer wheels and event loop polling, introducing 50 µs to 2,000 µs of task-scheduling jitter.
 
 ### 2.1 Invariant TSC Primitives
-`crucivec-pacer` reads the CPU invariant Timestamp Counter using the `quanta::Clock` primitive. On modern x86_64 architectures (`CPUID.80000007H:EDX[8]`), the invariant TSC increments at a fixed nominal frequency regardless of core frequency scaling (P-states) or sleep states (C-states), providing sub-10 ns clock read overhead.
+`fracture-pacer` reads the CPU invariant Timestamp Counter using the `quanta::Clock` primitive. On modern x86_64 architectures (`CPUID.80000007H:EDX[8]`), the invariant TSC increments at a fixed nominal frequency regardless of core frequency scaling (P-states) or sleep states (C-states), providing sub-10 ns clock read overhead.
 
 ### 2.2 Hybrid Sleep & Spin Architecture
 To conserve host CPU energy during low arrival rates without compromising sub-microsecond precision at high QPS:
@@ -54,7 +54,7 @@ To conserve host CPU energy during low arrival rates without compromising sub-mi
 
 ## 3. Binary Write-Ahead Log (WAL) Specification
 
-CruciVec enforces deterministic point-in-time ground truth. Measuring search recall against a live, concurrently mutating database causes temporal drift.
+Fracture enforces deterministic point-in-time ground truth. Measuring search recall against a live, concurrently mutating database causes temporal drift.
 
 ### 3.1 32-Byte Naturally Aligned Record Header
 Every mutation operation (insert, upsert, delete) is appended to an immutable binary WAL. To ensure zero-copy deserialization via `bytemuck` without unaligned memory panics, fields align to 8-byte boundaries:
@@ -84,10 +84,10 @@ Every mutation operation (insert, upsert, delete) is appended to an immutable bi
 
 ## 4. Kernel Telemetry via Cgroups v2
 
-To correlate tail latency spikes with Linux memory subsystem transitions, `crucivec-telemetry` samples the target container's cgroups v2 statistics.
+To correlate tail latency spikes with Linux memory subsystem transitions, `fracture-telemetry` samples the target container's cgroups v2 statistics.
 
 ### 4.1 Persistent File Descriptor Recycling
-Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs of overhead. CruciVec opens `/sys/fs/cgroup/memory.stat` and `cpu.stat` once at initialization, rewinding via `libc::lseek(fd, 0, SEEK_SET)` and reading into fixed stack buffers (`[u8; 4096]`). Parsing executes via an allocation-free byte scanner in under 2 µs.
+Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs of overhead. Fracture opens `/sys/fs/cgroup/memory.stat` and `cpu.stat` once at initialization, rewinding via `libc::lseek(fd, 0, SEEK_SET)` and reading into fixed stack buffers (`[u8; 4096]`). Parsing executes via an allocation-free byte scanner in under 2 µs.
 
 ### 4.2 Tracked Metrics
 * `pgmajfault`: Major page faults requiring synchronous disk block reads.

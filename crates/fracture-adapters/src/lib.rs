@@ -7,7 +7,7 @@ pub mod pgvector;
 pub mod qdrant;
 
 use async_trait::async_trait;
-use crucivec_core::types::{CollectionSchema, FilterPredicate};
+use fracture_core::types::{CollectionSchema, FilterPredicate};
 
 /// Standard asynchronous interface for target vector database clients.
 #[async_trait]

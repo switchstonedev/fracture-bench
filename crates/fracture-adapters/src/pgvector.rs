@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crucivec_core::types::{CollectionSchema, FilterPredicate};
+use fracture_core::types::{CollectionSchema, FilterPredicate};
 use serde::{Deserialize, Serialize};
 
 use crate::pg_client::SimplePgClient;
@@ -17,7 +17,7 @@ pub struct PgvectorConfig {
 impl Default for PgvectorConfig {
     fn default() -> Self {
         Self {
-            connection_string: "postgresql://postgres@127.0.0.1:5433/crucivec".to_string(),
+            connection_string: "postgresql://postgres@127.0.0.1:5433/fracture".to_string(),
             table_name: "vectors".to_string(),
             m: 16,
             ef_construction: 64,
@@ -39,7 +39,7 @@ impl PgvectorAdapter {
                 port: 5433,
                 user: "postgres".to_string(),
                 password: None,
-                database: "crucivec".to_string(),
+                database: "fracture".to_string(),
                 timeout: std::time::Duration::from_secs(5),
             });
         Self { config, client }

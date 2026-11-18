@@ -1,21 +1,21 @@
 [package]
-name = "crucivec-cli"
+name = "fracture-bench"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Main executable harness for CruciVec open-loop vector database benchmarking"
+description = "Main executable harness for Fracture open-loop vector database benchmarking"
 
 [[bin]]
-name = "crucivec"
+name = "fracture"
 path = "src/main.rs"
 
 [dependencies]
-crucivec-core = { workspace = true }
-crucivec-pacer = { workspace = true }
-crucivec-telemetry = { workspace = true }
-crucivec-adapters = { workspace = true }
+fracture-core = { workspace = true }
+fracture-pacer = { workspace = true }
+fracture-telemetry = { workspace = true }
+fracture-adapters = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

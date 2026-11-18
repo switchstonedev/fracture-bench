@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_matrix.py - Automated multi-engine benchmark matrix runner for CruciVec.
+run_matrix.py - Automated multi-engine benchmark matrix runner for Fracture.
 Adheres to ops/academic-artifact-evaluation three-tier hierarchy:
   - Level 1: dry_run (< 30s, zero load, connectivity and directory validation)
   - Level 2: sample (1-3 min, low QPS / small corpus pilot test)
@@ -27,7 +27,7 @@ TARGET_DEFAULTS = {
     "qdrant": {"host": "127.0.0.1", "port": 6333, "endpoint": "http://127.0.0.1:6333"},
     "pgvector": {"host": "127.0.0.1", "port": 5433, "endpoint": "127.0.0.1:5433"},
     "milvus": {"host": "127.0.0.1", "port": 19530, "endpoint": "http://127.0.0.1:19530"},
-    "lancedb": {"host": None, "port": None, "endpoint": "/tmp/crucivec_lancedb"},
+    "lancedb": {"host": None, "port": None, "endpoint": "/tmp/fracture_lancedb"},
 }
 
 def is_port_open(host: Optional[str], port: Optional[int], timeout: float = 0.5) -> bool:
@@ -47,21 +47,21 @@ def find_binary(workspace_root: Path, custom_path: Optional[str] = None) -> Path
         raise FileNotFoundError(f"Specified binary not found: {custom_path}")
 
     candidates = [
-        workspace_root / "target" / "release" / "crucivec.exe",
-        workspace_root / "target" / "release" / "crucivec",
-        workspace_root / "target" / "debug" / "crucivec.exe",
-        workspace_root / "target" / "debug" / "crucivec",
+        workspace_root / "target" / "release" / "fracture.exe",
+        workspace_root / "target" / "release" / "fracture",
+        workspace_root / "target" / "debug" / "fracture.exe",
+        workspace_root / "target" / "debug" / "fracture",
     ]
     for c in candidates:
         if c.is_file():
             return c
 
-    print("Building crucivec debug binary...")
-    subprocess.run(["cargo", "build", "-p", "crucivec-cli"], cwd=workspace_root, check=True)
+    print("Building fracture debug binary...")
+    subprocess.run(["cargo", "build", "-p", "fracture-bench"], cwd=workspace_root, check=True)
     for c in candidates:
         if c.is_file():
             return c
-    raise FileNotFoundError("Could not find or build crucivec executable")
+    raise FileNotFoundError("Could not find or build fracture executable")
 
 def format_placeholder(metric: str, origin_tech: str) -> str:
     return f"{{{metric}_{origin_tech}}}"
@@ -204,7 +204,7 @@ def run_sample_cell(
     }
 
 def main():
-    parser = argparse.ArgumentParser(description="Automated CruciVec Benchmark Matrix Runner")
+    parser = argparse.ArgumentParser(description="Automated Fracture Benchmark Matrix Runner")
     parser.add_argument(
         "--tier",
         type=str,
@@ -218,7 +218,7 @@ def main():
         default="results/matrix",
         help="Directory to store matrix JSON reports",
     )
-    parser.add_argument("--binary", type=str, default=None, help="Path to crucivec executable")
+    parser.add_argument("--binary", type=str, default=None, help="Path to fracture executable")
     parser.add_argument(
         "--targets",
         type=str,
@@ -257,7 +257,7 @@ def main():
         qps_levels = [1000, 2500, 5000, 10000]
 
     print("===========================================================")
-    print("  CruciVec: Automated Matrix Benchmark Runner             ")
+    print("  Fracture: Automated Matrix Benchmark Runner             ")
     print("===========================================================")
     print(f"Execution Tier : {tier.upper()}")
     print(f"Target Engines : {', '.join(targets)}")

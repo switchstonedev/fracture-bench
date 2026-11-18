@@ -215,7 +215,7 @@ def generate_markdown_table(cells: List[Dict[str, Any]], output_path: Path):
     ]
 
     lines = [
-        "# CruciVec Empirical Benchmark Summary",
+        "# Fracture Empirical Benchmark Summary",
         "",
         "| " + " | ".join(headers) + " |",
         "| " + " | ".join(["---"] * len(headers)) + " |",
@@ -289,7 +289,7 @@ def generate_latex_table(cells: List[Dict[str, Any]], output_path: Path):
     print(f"Generated LaTeX Tabular -> {output_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate CruciVec Visual and Tabular Reports")
+    parser = argparse.ArgumentParser(description="Generate Fracture Visual and Tabular Reports")
     parser.add_argument("--input", "-i", type=str, help="Path to single benchmark JSON export")
     parser.add_argument(
         "--input-matrix",

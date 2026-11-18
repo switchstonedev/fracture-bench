@@ -1,14 +1,14 @@
 [package]
-name = "crucivec-pacer"
+name = "fracture-pacer"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core-pinned hardware TSC open-loop Poisson arrival timing engine"
+description = "Core-pinned hardware TSC open-loop Poisson arrival timing engine for Fracture"
 
 [dependencies]
-crucivec-core = { workspace = true }
+fracture-core = { workspace = true }
 quanta = { workspace = true }
 crossbeam-channel = { workspace = true }
 core_affinity = { workspace = true }

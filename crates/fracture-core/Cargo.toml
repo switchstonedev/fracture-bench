@@ -1,11 +1,11 @@
 [package]
-name = "crucivec-core"
+name = "fracture-core"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Shared domain types, zero-copy binary WAL serialization, and SIMD exact k-NN kernels"
+description = "Shared domain types, zero-copy binary WAL serialization, and SIMD exact k-NN kernels for Fracture"
 
 [dependencies]
 bytemuck = { workspace = true }

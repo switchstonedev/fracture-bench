@@ -3,7 +3,7 @@ version: '3.8'
 services:
   qdrant:
     image: qdrant/qdrant:v1.8.0
-    container_name: crucivec_qdrant
+    container_name: fracture_qdrant
     restart: unless-stopped
     ports:
       - "6333:6333" # HTTP REST API

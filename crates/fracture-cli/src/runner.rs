@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::Receiver;
-use crucivec_adapters::VectorEngineAdapter;
-use crucivec_core::types::{DispatchTicket, QueryType};
+use fracture_adapters::VectorEngineAdapter;
+use fracture_core::types::{DispatchTicket, QueryType};
 use hdrhistogram::Histogram;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;

@@ -322,82 +322,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
-name = "crucivec-adapters"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "crucivec-core",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "crucivec-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "crossbeam-channel",
- "crucivec-adapters",
- "crucivec-core",
- "crucivec-pacer",
- "crucivec-telemetry",
- "hdrhistogram",
- "rand",
- "rand_xoshiro",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "crucivec-core"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "rand",
- "rand_xoshiro",
- "rayon",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "crucivec-pacer"
-version = "0.1.0"
-dependencies = [
- "core_affinity",
- "criterion",
- "crossbeam-channel",
- "crucivec-core",
- "hdrhistogram",
- "libc",
- "quanta",
- "rand",
- "rand_xoshiro",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "crucivec-telemetry"
-version = "0.1.0"
-dependencies = [
- "libc",
- "serde",
- "serde_json",
- "thiserror",
- "tracing",
-]
-
-[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -428,6 +352,82 @@ dependencies = [
  "crc32fast",
  "miniz_oxide",
  "zlib-rs",
+]
+
+[[package]]
+name = "fracture-adapters"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "fracture-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "fracture-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossbeam-channel",
+ "fracture-adapters",
+ "fracture-core",
+ "fracture-pacer",
+ "fracture-telemetry",
+ "hdrhistogram",
+ "rand",
+ "rand_xoshiro",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "fracture-core"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "rand",
+ "rand_xoshiro",
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "fracture-pacer"
+version = "0.1.0"
+dependencies = [
+ "core_affinity",
+ "criterion",
+ "crossbeam-channel",
+ "fracture-core",
+ "hdrhistogram",
+ "libc",
+ "quanta",
+ "rand",
+ "rand_xoshiro",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "fracture-telemetry"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

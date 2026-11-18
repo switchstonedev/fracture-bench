@@ -30,40 +30,16 @@
 <text x="65" y="127.75" text-anchor="end" class="axis">75</text>
 <line x1="75" y1="45.0" x2="670" y2="45.0" class="grid" />
 <text x="65" y="49.0" text-anchor="end" class="axis">100</text>
-<circle cx="670.0" cy="133.2" r="5.5" fill="#2ca02c" class="point" />
-<text x="678.0" y="137.2" font-family="sans-serif" font-size="9" fill="#333">mock (churn)</text>
-<circle cx="670.0" cy="136.4" r="5.5" fill="#2ca02c" class="point" />
-<text x="678.0" y="140.4" font-family="sans-serif" font-size="9" fill="#333">mock (read)</text>
-<circle cx="670.0" cy="133.2" r="5.5" fill="#2ca02c" class="point" />
-<text x="678.0" y="137.2" font-family="sans-serif" font-size="9" fill="#333">mock (write)</text>
-<circle cx="122.6" cy="136.4" r="5.5" fill="#1f77b4" class="point" />
-<text x="130.6" y="140.4" font-family="sans-serif" font-size="9" fill="#333">qdrant (churn)</text>
-<circle cx="133.3" cy="136.4" r="5.5" fill="#1f77b4" class="point" />
-<text x="141.3" y="140.4" font-family="sans-serif" font-size="9" fill="#333">qdrant (read)</text>
-<circle cx="102.4" cy="136.4" r="5.5" fill="#1f77b4" class="point" />
-<text x="110.4" y="140.4" font-family="sans-serif" font-size="9" fill="#333">qdrant (write)</text>
-<circle cx="363.0" cy="158.4" r="5.5" fill="#ff7f0e" class="point" />
-<text x="371.0" y="162.4" font-family="sans-serif" font-size="9" fill="#333">pgvector (churn)</text>
-<circle cx="384.4" cy="158.4" r="5.5" fill="#ff7f0e" class="point" />
-<text x="392.4" y="162.4" font-family="sans-serif" font-size="9" fill="#333">pgvector (read)</text>
-<circle cx="320.1" cy="161.6" r="5.5" fill="#ff7f0e" class="point" />
-<text x="328.1" y="165.6" font-family="sans-serif" font-size="9" fill="#333">pgvector (write)</text>
-<circle cx="75.0" cy="133.2" r="5.5" fill="#d62728" class="point" />
-<text x="83.0" y="137.2" font-family="sans-serif" font-size="9" fill="#333">lancedb (churn)</text>
-<circle cx="75.0" cy="136.4" r="5.5" fill="#d62728" class="point" />
-<text x="83.0" y="140.4" font-family="sans-serif" font-size="9" fill="#333">lancedb (read)</text>
-<circle cx="75.0" cy="130.1" r="5.5" fill="#d62728" class="point" />
-<text x="83.0" y="134.1" font-family="sans-serif" font-size="9" fill="#333">lancedb (write)</text>
 <text x="372.5" y="405" text-anchor="middle" class="axis">Mean Recall@10 (Ground-Truth Correctness)</text>
 <text transform="rotate(-90)" x="-202.5" y="20" text-anchor="middle" class="axis">Achieved Throughput (QPS)</text>
 <rect x="95" y="57" width="10" height="10" fill="#d62728" />
-<text x="111" y="65" class="legend">lancedb (measured)</text>
+<text x="111" y="65" class="legend">lancedb (pending: {qps_lancedb})</text>
 <rect x="95" y="73" width="10" height="10" fill="#9467bd" />
 <text x="111" y="81" class="legend">milvus (pending: {qps_milvus})</text>
 <rect x="95" y="89" width="10" height="10" fill="#2ca02c" />
-<text x="111" y="97" class="legend">mock (measured)</text>
+<text x="111" y="97" class="legend">mock (pending: {qps_mock})</text>
 <rect x="95" y="105" width="10" height="10" fill="#ff7f0e" />
-<text x="111" y="113" class="legend">pgvector (measured)</text>
+<text x="111" y="113" class="legend">pgvector (pending: {qps_pgvector})</text>
 <rect x="95" y="121" width="10" height="10" fill="#1f77b4" />
-<text x="111" y="129" class="legend">qdrant (measured)</text>
+<text x="111" y="129" class="legend">qdrant (pending: {qps_qdrant})</text>
 </svg>

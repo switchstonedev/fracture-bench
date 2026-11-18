@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-reproduce.py - Deterministic single-entrypoint reproduction harness for CruciVec.
+reproduce.py - Deterministic single-entrypoint reproduction harness for Fracture.
 Adheres strictly to ops/academic-artifact-evaluation for ACM/IEEE reproducibility badging.
 
 Execution Hierarchy:
@@ -65,7 +65,7 @@ def verify_sha256_manifest(workspace_root: Path, manifest_file: Path) -> Verific
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Single-entrypoint reproduction harness for CruciVec benchmarks"
+        description="Single-entrypoint reproduction harness for Fracture benchmarks"
     )
     parser.add_argument(
         "--tier",
@@ -123,7 +123,7 @@ def main():
     manifest_file = workspace_root / "sha256sums.txt"
 
     print("=================================================================")
-    print("  CruciVec: Deterministic Academic Artifact Reproduction Harness ")
+    print("  Fracture: Deterministic Academic Artifact Reproduction Harness ")
     print("=================================================================")
     print(f"Target Tier     : {tier.upper()}")
     print(f"Workspace Root  : {workspace_root}")

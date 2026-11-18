@@ -18,15 +18,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 def find_binary(workspace_root: Path) -> Path:
     candidates = [
-        workspace_root / "target" / "release" / "crucivec.exe",
-        workspace_root / "target" / "release" / "crucivec",
-        workspace_root / "target" / "debug" / "crucivec.exe",
-        workspace_root / "target" / "debug" / "crucivec",
+        workspace_root / "target" / "release" / "fracture.exe",
+        workspace_root / "target" / "release" / "fracture",
+        workspace_root / "target" / "debug" / "fracture.exe",
+        workspace_root / "target" / "debug" / "fracture",
     ]
     for c in candidates:
         if c.is_file():
             return c
-    raise FileNotFoundError("crucivec executable not found")
+    raise FileNotFoundError("fracture executable not found")
 
 def generate_svg_recall_drift(
     checkpoints: List[Dict[str, Any]],
@@ -146,7 +146,7 @@ def main():
         subprocess.run(seed_cmd, cwd=workspace_root, check=True, capture_output=True)
 
     print("===========================================================")
-    print("  CruciVec: Measuring Graph Fragmentation & Recall Drift   ")
+    print("  Fracture: Measuring Graph Fragmentation & Recall Drift   ")
     print("===========================================================")
     print(f"WAL File       : {wal_file}")
     print(f"Target Adapter : {args.target}")

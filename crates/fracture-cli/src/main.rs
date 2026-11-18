@@ -10,22 +10,22 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use crucivec_adapters::{
+use fracture_adapters::{
     LanceDbAdapter, LanceDbConfig, MilvusAdapter, MilvusConfig, MockVectorAdapter, PgvectorAdapter,
     PgvectorConfig, QdrantAdapter, QdrantConfig, VectorEngineAdapter,
 };
-use crucivec_core::dataset::SyntheticDataset;
-use crucivec_core::types::{CollectionSchema, DistanceMetric};
-use crucivec_core::wal::{WalOpType, WalReader, WalWriter};
-use crucivec_pacer::{HardwarePacer, PacerConfig, WorkloadConfig, WorkloadType};
-use crucivec_telemetry::TelemetrySampler;
+use fracture_core::dataset::SyntheticDataset;
+use fracture_core::types::{CollectionSchema, DistanceMetric};
+use fracture_core::wal::{WalOpType, WalReader, WalWriter};
+use fracture_pacer::{HardwarePacer, PacerConfig, WorkloadConfig, WorkloadType};
+use fracture_telemetry::TelemetrySampler;
 use runner::BenchmarkRunner;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "crucivec",
+    name = "fracture",
     version,
-    about = "The open-loop crucible for vector databases"
+    about = "High-pressure vector database benchmarking by SwitchStone"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -235,9 +235,9 @@ async fn main() -> anyhow::Result<()> {
         } => {
             println!("===========================================================");
             if closed_loop {
-                println!("  CruciVec: Running Closed-Loop Concurrency-Bound Benchmark");
+                println!("  Fracture: Running Closed-Loop Concurrency-Bound Benchmark");
             } else {
-                println!("  CruciVec: Running Open-Loop Hardware-Paced Benchmark     ");
+                println!("  Fracture: Running Open-Loop Hardware-Paced Benchmark     ");
             }
             println!("===========================================================");
             println!("Target Engine : {}", target);
@@ -277,7 +277,7 @@ async fn main() -> anyhow::Result<()> {
 
             // Initialize target schema
             let schema = CollectionSchema {
-                name: "crucivec_bench".to_string(),
+                name: "fracture_bench".to_string(),
                 dimension,
                 metric: DistanceMetric::Cosine,
             };
@@ -459,7 +459,7 @@ async fn main() -> anyhow::Result<()> {
             dry_run,
         } => {
             println!("===========================================================");
-            println!("  CruciVec: Pre-populating Target Database Corpus (Seed)   ");
+            println!("  Fracture: Pre-populating Target Database Corpus (Seed)   ");
             println!("===========================================================");
             println!("Target Engine : {}", target);
             println!("Target Count  : {}", count);
@@ -482,7 +482,7 @@ async fn main() -> anyhow::Result<()> {
 
             let adapter = create_adapter(&target, endpoint);
             let schema = CollectionSchema {
-                name: "crucivec_bench".to_string(),
+                name: "fracture_bench".to_string(),
                 dimension,
                 metric: DistanceMetric::Cosine,
             };
@@ -609,7 +609,7 @@ async fn main() -> anyhow::Result<()> {
             output,
         } => {
             println!("===========================================================");
-            println!("  CruciVec: Replaying Binary WAL for Point-in-Time Ground Truth ");
+            println!("  Fracture: Replaying Binary WAL for Point-in-Time Ground Truth ");
             println!("===========================================================");
             println!("WAL File   : {:?}", wal_path);
             println!("Cutoff LSN : {}", cutoff_lsn);

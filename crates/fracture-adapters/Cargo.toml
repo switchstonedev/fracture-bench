@@ -1,16 +1,18 @@
 [package]
-name = "crucivec-telemetry"
+name = "fracture-adapters"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Allocation-free Linux cgroups v2 kernel telemetry parser (workingset_refault, pgmajfault, CFS throttling)"
+description = "Unified vector database adapter interfaces (Qdrant, Milvus, pgvector, LanceDB) for Fracture"
 
 [dependencies]
+fracture-core = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-libc = { workspace = true }
-

@@ -4,12 +4,12 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use crucivec_adapters::VectorEngineAdapter;
-use crucivec_core::dataset::FvecsReader;
-use crucivec_core::simd::find_exact_top_k;
-use crucivec_core::types::DistanceMetric;
-use crucivec_core::wal::WalReader;
-use crucivec_pacer::workload::{WorkloadConfig, WorkloadGenerator, WorkloadType};
+use fracture_adapters::VectorEngineAdapter;
+use fracture_core::dataset::FvecsReader;
+use fracture_core::simd::find_exact_top_k;
+use fracture_core::types::DistanceMetric;
+use fracture_core::wal::WalReader;
+use fracture_pacer::workload::{WorkloadConfig, WorkloadGenerator, WorkloadType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,7 +154,7 @@ pub async fn verify_with_target_adapter(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crucivec_core::wal::{WalOpType, WalWriter};
+    use fracture_core::wal::{WalOpType, WalWriter};
 
     #[test]
     fn test_verify_wal_recall() {

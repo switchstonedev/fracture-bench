@@ -15,7 +15,7 @@ lint:
 	cargo clippy --workspace --all-targets -- -D warnings
 
 run-mock:
-	cargo run -p crucivec-cli -- run --target mock --qps 5000 --duration-sec 5
+	cargo run -p fracture-bench -- run --target mock --qps 5000 --duration-sec 5
 
 bench-all:
 	python scripts/reproduce.py --tier sample

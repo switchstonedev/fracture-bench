@@ -40,7 +40,7 @@ impl TelemetrySampler {
         let running_clone = Arc::clone(&running);
 
         let worker_handle = thread::Builder::new()
-            .name("crucivec-telemetry".to_string())
+            .name("fracture-telemetry".to_string())
             .spawn(move || {
                 let start = Instant::now();
                 let mut samples = Vec::with_capacity(10_000);

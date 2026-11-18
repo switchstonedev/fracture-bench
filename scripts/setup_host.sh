@@ -3,7 +3,7 @@
 set -euo pipefail
 
 echo "=========================================================="
-echo "  CruciVec Host Setup: Core Pinning & Cgroups v2 Isolation "
+echo "  Fracture Host Setup: Core Pinning & Cgroups v2 Isolation "
 echo "=========================================================="
 
 if [ "$EUID" -ne 0 ]; then
@@ -28,7 +28,7 @@ sysctl -w vm.max_map_count=262144
 
 # 3. Create Isolated Cgroup v2 for Target Database
 echo "[3/4] Establishing strict cgroups v2 benchmark slice..."
-CGROUP_DIR="/sys/fs/cgroup/crucivec_target"
+CGROUP_DIR="/sys/fs/cgroup/fracture_target"
 mkdir -p "$CGROUP_DIR"
 
 # 4 dedicated CPU cores (Cores 4-7)

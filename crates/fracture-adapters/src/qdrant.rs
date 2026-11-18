@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crucivec_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
+use fracture_core::types::{CollectionSchema, DistanceMetric, FilterPredicate};
 use serde::{Deserialize, Serialize};
 
 use crate::http_client::SimpleHttpClient;
@@ -17,7 +17,7 @@ impl Default for QdrantConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://127.0.0.1:6333".to_string(),
-            collection_name: "crucivec_bench".to_string(),
+            collection_name: "fracture_bench".to_string(),
             ef_search: Some(100),
         }
     }

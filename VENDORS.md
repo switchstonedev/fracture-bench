@@ -1,6 +1,6 @@
-# CruciVec Vendor-Neutral Infrastructure Audit (VENDORS.md)
+# Fracture Vendor-Neutral Infrastructure Audit (VENDORS.md)
 
-CruciVec serves as an adversarial, vendor-neutral referee for vector databases. To guarantee absolute metrological integrity, avoid synthetic "clean-room" biases, and eliminate artificial handicaps, all target database configurations, index parameters, and kernel resource boundaries are audited and publicly documented here.
+Fracture serves as an adversarial, vendor-neutral referee for vector databases. To guarantee absolute metrological integrity, avoid synthetic "clean-room" biases, and eliminate artificial handicaps, all target database configurations, index parameters, and kernel resource boundaries are audited and publicly documented here.
 
 ---
 
@@ -20,7 +20,7 @@ CruciVec serves as an adversarial, vendor-neutral referee for vector databases. 
 * **Version:** `qdrant/qdrant:v1.8.0`
 * **Network Protocol:** HTTP / REST on port 6333, gRPC on port 6334
 * **Vector Schema:**
-  - Collection: `crucivec_bench`
+  - Collection: `fracture_bench`
   - Distance Metric: `Cosine`
   - Vector Dimension: 128 (configurable)
 * **HNSW Index Parameters:**
@@ -45,13 +45,13 @@ CruciVec serves as an adversarial, vendor-neutral referee for vector databases. 
 * **Vector Schema:**
   ```sql
   CREATE EXTENSION IF NOT EXISTS vector;
-  CREATE TABLE IF NOT EXISTS crucivec_bench (
+  CREATE TABLE IF NOT EXISTS fracture_bench (
       id BIGINT PRIMARY KEY,
       embedding vector(128),
       category INT
   );
-  CREATE INDEX IF NOT EXISTS crucivec_hnsw_idx 
-  ON crucivec_bench USING hnsw (embedding vector_cosine_ops) 
+  CREATE INDEX IF NOT EXISTS fracture_hnsw_idx 
+  ON fracture_bench USING hnsw (embedding vector_cosine_ops) 
   WITH (m = 16, ef_construction = 64);
   ```
 * **PostgreSQL Engine Tuning:**
@@ -113,7 +113,7 @@ CruciVec serves as an adversarial, vendor-neutral referee for vector databases. 
 
 ## 3. Maintainer Configuration Review Protocol
 
-Database maintainers wishing to audit, refine, or optimize their engine's configuration in CruciVec must adhere to the following rules:
+Database maintainers wishing to audit, refine, or optimize their engine's configuration in Fracture must adhere to the following rules:
 
 1. **Deterministic Index Creation:** Any recommended index tuning must be applied via adapter initialization code (`VectorEngineAdapter::init`) or the Docker compose fixture.
 2. **No Memory Limit Bypasses:** Container definitions must retain cgroup memory ceilings to ensure fair comparison under working-set pressure.

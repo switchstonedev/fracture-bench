@@ -5,8 +5,8 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
-use crucivec_core::types::{DispatchTicket, QueryType};
-use crucivec_core::wal::{WalOpType, WalWriter};
+use fracture_core::types::{DispatchTicket, QueryType};
+use fracture_core::wal::{WalOpType, WalWriter};
 use hdrhistogram::Histogram;
 use tracing::debug;
 
@@ -67,9 +67,9 @@ impl HardwarePacer {
         let unserved_clone = Arc::clone(&unserved_count);
 
         let worker_thread = thread::Builder::new()
-            .name("crucivec-pacer".to_string())
+            .name("fracture-pacer".to_string())
             .spawn(move || run_pacer_loop(config, sender, running_clone, unserved_clone))
-            .expect("Failed to spawn crucivec-pacer OS thread");
+            .expect("Failed to spawn fracture-pacer OS thread");
 
         Self {
             running,
@@ -307,7 +307,7 @@ mod tests {
 
         // Verify WAL file exists and can be parsed
         let mut reader =
-            crucivec_core::wal::WalReader::open(&wal_path).expect("Failed to open written WAL");
+            fracture_core::wal::WalReader::open(&wal_path).expect("Failed to open written WAL");
         let snapshot = reader
             .reconstruct_state(u64::MAX)
             .expect("Failed to reconstruct WAL state");
