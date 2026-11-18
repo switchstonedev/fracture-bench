@@ -32,4 +32,4 @@ Academic reviewers and independent practitioners evaluating vector database perf
 ## References
 - System Architecture: [[wiki/architecture]] (relates_to)
 - WAL Replay: [[wiki/adr/002-open-loop-wal-architecture]] (relates_to)
-- Repository Conventions: [[wiki/repo-tastes/awesome06-crucivec]] (relates_to)
+- Repository Conventions: [[wiki/repo-tastes/switchstonedev-fracture-bench]] (relates_to)
