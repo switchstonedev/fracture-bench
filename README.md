@@ -55,11 +55,11 @@ flowchart TD
 
 Fracture isolates load generation, target execution, kernel telemetry, and mathematical scoring into independent subsystems to eliminate measurement perturbation:
 
-*   **`fracture-pacer`:** High-precision arrival scheduler running on an isolated, pinned CPU core. Uses hardware Timestamp Counter (`quanta`) to drive Poisson arrivals with sub-microsecond jitter at 50,000 QPS.
-*   **`fracture-core`:** Domain types, 32-byte naturally aligned binary Write-Ahead Log (WAL), dataset readers (.fvecs, .bvecs), and AVX2/NEON SIMD linear-scan k-NN kernels for decoupled ground-truth calculation.
-*   **`fracture-telemetry`:** Zero-allocation Linux `/sys/fs/cgroup` parser sampling page faults, workingset refaults, and CFS CPU throttling in under 2 µs per sample using persistent file descriptors.
-*   **`fracture-adapters`:** Unified client trait implementations for Qdrant (gRPC/HTTP), pgvector (SQL with trust auth), Milvus, and LanceDB.
-*   **`fracture-bench`:** Main executable harness crate publishing the `fracture` CLI with `run`, `seed`, `verify`, and `profile` subcommands.
+*   **`fracture-pacer`:** High-precision arrival scheduler running on an isolated, pinned CPU core. Uses hardware Timestamp Counter (`quanta`) to drive Poisson arrivals with sub-microsecond jitter at 50,000 QPS. Supports FIFO sliding-window and cluster-targeted adversarial churn.
+*   **`fracture-core`:** Domain types, 64-byte cache-line aligned binary Write-Ahead Log (WAL), contiguous `VectorArena` with 64-bit visibility bitset skipping, dataset readers (.fvecs, .bvecs), and dual-bound linearizability classification.
+*   **`fracture-telemetry`:** Zero-allocation Linux `/sys/fs/cgroup` parser sampling page faults, workingset refaults, CFS CPU throttling, Linux PSI (`memory.pressure`), and Write Amplification Factor (`io.stat`) in under 2 µs per sample using persistent file descriptors.
+*   **`fracture-adapters`:** Unified client trait implementations for Qdrant (gRPC/HTTP), pgvector (zero-text binary wire format code 1), Milvus, and LanceDB.
+*   **`fracture-bench`:** Main executable harness crate publishing the `fracture` CLI with `run`, `seed`, `verify`, `profile`, `doctor`, `cliff-finder`, and `rightsize` subcommands.
 
 ---
 
@@ -69,21 +69,21 @@ Fracture isolates load generation, target execution, kernel telemetry, and mathe
    Fracture tracks dual histograms per worker task:
    *   `service_time`: Network round-trip duration (t_recv - t_sent).
    *   `total_response_time`: True end-to-end latency including client queue delay (t_recv - t_intended).
-2. **Deterministic Point-in-Time Ground Truth:**
-   Ground truth is never evaluated against mutable live state. Mutations are appended to an immutable binary WAL with monotonic Log Sequence Numbers (LSNs). Queries record their observed commit boundary, and ground-truth nearest neighbors are reconstructed post-hoc.
-3. **Decoupled Ground-Truth Computation:**
-   Brute-force SIMD scans are executed offline to prevent memory bus and cache pollution during the live benchmark run.
+2. **Deterministic Point-in-Time Ground Truth & Dual-Bound Linearizability:**
+   Ground truth is never evaluated against mutable live state. Mutations are appended to an immutable binary WAL with monotonic Log Sequence Numbers (LSNs) and ACK boundaries. Queries classify candidate spaces into `S_committed` and `S_inflight` under neutral scoring rules.
+3. **Decoupled Ground-Truth Computation & Arena Locality:**
+   Exact k-NN scans are executed offline using contiguous 64-byte aligned vector arenas with 64-bit active visibility bitsets, skipping tombstoned candidate blocks zero-copy.
 4. **Three-Tier Reproduction Hierarchy (ACM/IEEE Badging Standards):**
    *   **Level 1 — Dry Run (`--tier dry_run` / `--dry-run`):** 10-30s wiring and environment sanity check with zero compute load.
    *   **Level 2 — Sample / Pilot (`--tier sample` / `--sample`):** 1-3 min pilot run on accessible engines yielding initial ground-truth metrics without resource lockup.
    *   **Level 3 — Full Benchmark (`--tier full` / `--full`):** Complete QPS sweeps across all engines when dedicated compute infrastructure is available.
 5. **Standardized Research Placeholder Policy:**
    Any unexecuted or unreachable engine metric is recorded strictly as `{metric_originTech}` (e.g. `{achievedQps_milvus}`, `{recall10_pgvector}`). Fabricated numbers are strictly forbidden.
-6. **Stratified Modulo Selectivity:**
-   Metadata filter queries are partitioned into three calibrated cohorts:
-   *   High Selectivity: ~60% match rate (`id % 10 in [0..5]`).
-   *   Medium Selectivity: ~10% match rate (`id % 10 == 0`).
-   *   Needle-in-a-Haystack: ~0.1% match rate (`id % 1000 == 42`).
+6. **Stratified Hashed Modulo Selectivity:**
+   Metadata filter queries are partitioned into three calibrated cohorts using seeded hash mixers (`hash_id_seeded(id, seed) % modulo`) to destroy sequential insertion order correlation:
+   *   High Selectivity: ~60% match rate (`modulo 10 in [0..5]`).
+   *   Medium Selectivity: ~10% match rate (`modulo 10 == 0`).
+   *   Needle-in-a-Haystack: ~0.1% match rate (`modulo 1000 == 42`).
 
 ---
 
@@ -143,7 +143,26 @@ python scripts/reproduce.py --tier full
     --cutoff-lsn 1000 \
     --k 10 \
     --target qdrant \
+    --linearizable \
     --output ./results/qdrant_recall.json
+```
+
+### Self-Calibration Jitter Gate (Doctor)
+```bash
+# Validate host timer resolution and check for pacer skew (< 50 µs threshold)
+./target/release/fracture doctor --target-qps 10000 --duration-sec 5
+```
+
+### RAM Working-Set Cliff Finder
+```bash
+# Pinpoint memory exhaustion where page cache thrashing occurs
+./target/release/fracture cliff-finder --target qdrant --initial-mb 4096 --min-mb 512
+```
+
+### RAM Budget Rightsizing Analyzer
+```bash
+# Evaluate vector count feasibility against an assigned RAM budget
+./target/release/fracture rightsize --target pgvector --count 250000 --dimension 768 --ram-budget-mb 2048
 ```
 
 ---

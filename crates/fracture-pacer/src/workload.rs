@@ -16,6 +16,10 @@ pub enum WorkloadType {
     WriteHeavy50_50,
     /// 100% Search (Zero mutation baseline).
     SearchOnly,
+    /// FIFO Sliding-Window Churn (Deletes oldest inserted living IDs, systematically purging HNSW upper hubs).
+    FifoChurn,
+    /// Cluster-Targeted Purge (Simultaneously evicts an entire directional semantic neighborhood).
+    ClusterPurge,
 }
 
 impl FromStr for WorkloadType {
@@ -27,8 +31,10 @@ impl FromStr for WorkloadType {
             "read-heavy-90-10" | "read-heavy" => Ok(Self::ReadHeavy90_10),
             "write-heavy-50-50" | "write-heavy" => Ok(Self::WriteHeavy50_50),
             "search-only" | "search" => Ok(Self::SearchOnly),
+            "fifo-churn" | "fifo" => Ok(Self::FifoChurn),
+            "cluster-purge" | "cluster" => Ok(Self::ClusterPurge),
             other => Err(format!(
-                "Unknown workload profile '{}'. Valid profiles: churn-70-20-10, read-heavy-90-10, write-heavy-50-50, search-only",
+                "Unknown workload profile '{}'. Valid profiles: churn-70-20-10, read-heavy-90-10, write-heavy-50-50, search-only, fifo-churn, cluster-purge",
                 other
             )),
         }
@@ -42,6 +48,8 @@ pub struct WorkloadConfig {
     pub dimension: usize,
     pub top_k: usize,
     pub filter_stratified: bool,
+    pub fifo_window_size: usize,
+    pub audit_canary_rate: f64,
 }
 
 impl Default for WorkloadConfig {
@@ -51,6 +59,8 @@ impl Default for WorkloadConfig {
             dimension: 128,
             top_k: 10,
             filter_stratified: true,
+            fifo_window_size: 10_000,
+            audit_canary_rate: 0.01,
         }
     }
 }
@@ -62,12 +72,16 @@ impl WorkloadConfig {
             dimension,
             top_k,
             filter_stratified: true,
+            fifo_window_size: 10_000,
+            audit_canary_rate: 0.01,
         }
     }
 
     pub fn ratios(&self) -> (f64, f64, f64) {
         match self.workload_type {
-            WorkloadType::Churn70_20_10 => (0.70, 0.20, 0.10),
+            WorkloadType::Churn70_20_10 | WorkloadType::FifoChurn | WorkloadType::ClusterPurge => {
+                (0.70, 0.20, 0.10)
+            }
             WorkloadType::ReadHeavy90_10 => (0.90, 0.10, 0.00),
             WorkloadType::WriteHeavy50_50 => (0.50, 0.40, 0.10),
             WorkloadType::SearchOnly => (1.00, 0.00, 0.00),
@@ -84,6 +98,9 @@ pub struct WorkloadGenerator {
     top_k: usize,
     filter_stratified: bool,
     next_id: u64,
+    workload_type: WorkloadType,
+    fifo_window_size: usize,
+    audit_canary_rate: f64,
 }
 
 impl WorkloadGenerator {
@@ -97,6 +114,9 @@ impl WorkloadGenerator {
             top_k: config.top_k,
             filter_stratified: config.filter_stratified,
             next_id: 1,
+            workload_type: config.workload_type,
+            fifo_window_size: config.fifo_window_size,
+            audit_canary_rate: config.audit_canary_rate,
         }
     }
 
@@ -153,9 +173,18 @@ impl WorkloadGenerator {
             } else {
                 None
             };
-            QueryType::Search {
-                k: self.top_k,
-                filter,
+
+            let is_canary = self.audit_canary_rate > 0.0 && self.rng.gen::<f64>() < self.audit_canary_rate;
+            if is_canary {
+                QueryType::AuditSearch {
+                    k: self.top_k,
+                    filter,
+                }
+            } else {
+                QueryType::Search {
+                    k: self.top_k,
+                    filter,
+                }
             }
         } else if p < self.search_ratio + self.upsert_ratio {
             let id = self.next_id;
@@ -163,10 +192,28 @@ impl WorkloadGenerator {
             let vector = self.generate_vector();
             QueryType::Upsert { id, vector }
         } else {
-            let target_id = if self.next_id > 10 {
-                self.rng.gen_range(1..self.next_id - 5)
-            } else {
-                1
+            let target_id = match self.workload_type {
+                WorkloadType::FifoChurn => {
+                    if self.next_id > self.fifo_window_size as u64 {
+                        self.next_id - self.fifo_window_size as u64
+                    } else {
+                        1
+                    }
+                }
+                WorkloadType::ClusterPurge => {
+                    if self.next_id > 10 {
+                        (self.next_id / 10) * 10
+                    } else {
+                        1
+                    }
+                }
+                _ => {
+                    if self.next_id > 10 {
+                        self.rng.gen_range(1..self.next_id - 5)
+                    } else {
+                        1
+                    }
+                }
             };
             QueryType::Delete { id: target_id }
         }
@@ -188,7 +235,7 @@ mod tests {
 
         for _ in 0..10_000 {
             match gen.next_op() {
-                QueryType::Search { .. } => searches += 1,
+                QueryType::Search { .. } | QueryType::AuditSearch { .. } => searches += 1,
                 QueryType::Upsert { .. } => upserts += 1,
                 QueryType::Delete { .. } => deletes += 1,
             }
@@ -198,5 +245,24 @@ mod tests {
         assert!(((searches as f64 / total) - 0.70).abs() < 0.03);
         assert!(((upserts as f64 / total) - 0.20).abs() < 0.03);
         assert!(((deletes as f64 / total) - 0.10).abs() < 0.02);
+    }
+
+    #[test]
+    fn test_fifo_sliding_window_churn() {
+        let mut config = WorkloadConfig::new(WorkloadType::FifoChurn, 32, 5);
+        config.fifo_window_size = 50;
+        let mut gen = WorkloadGenerator::new(&config, 100);
+
+        let mut deleted_ids = Vec::new();
+        for _ in 0..1_000 {
+            if let QueryType::Delete { id } = gen.next_op() {
+                deleted_ids.push(id);
+            }
+        }
+
+        // Deletes after window saturation must follow sliding window progression
+        assert!(!deleted_ids.is_empty());
+        let last_deleted = *deleted_ids.last().unwrap();
+        assert!(last_deleted > 1);
     }
 }

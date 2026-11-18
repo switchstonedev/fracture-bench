@@ -82,7 +82,7 @@ impl BenchmarkRunner {
 
                     // Execute request against target database adapter
                     match ticket.query_type {
-                        QueryType::Search { k, filter } => {
+                        QueryType::Search { k, filter } | QueryType::AuditSearch { k, filter } => {
                             if let Some(ref qs) = queries_clone {
                                 if !qs.is_empty() {
                                     let q = &qs[(completed as usize) % qs.len()];
@@ -195,7 +195,8 @@ impl BenchmarkRunner {
                     let t_sent = Instant::now();
 
                     match op {
-                        QueryType::Search { k: query_k, filter } => {
+                        QueryType::Search { k: query_k, filter }
+                        | QueryType::AuditSearch { k: query_k, filter } => {
                             let eff_k = if k > 0 { k } else { query_k };
                             if let Some(ref qs) = queries_clone {
                                 if !qs.is_empty() {

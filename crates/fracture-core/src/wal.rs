@@ -29,6 +29,8 @@ pub enum WalOpType {
     Insert = 1,
     Upsert = 2,
     Delete = 3,
+    Search = 4,
+    AuditSearch = 5,
 }
 
 impl WalOpType {
@@ -37,33 +39,52 @@ impl WalOpType {
             1 => Some(Self::Insert),
             2 => Some(Self::Upsert),
             3 => Some(Self::Delete),
+            4 => Some(Self::Search),
+            5 => Some(Self::AuditSearch),
             _ => None,
         }
     }
 }
 
-/// Strictly aligned 32-byte binary header preceding every WAL record.
-/// Natural 8-byte alignment guarantees safe zero-copy deserialization via bytemuck.
-#[repr(C)]
+/// Bitfield flags for WAL record tracking.
+pub mod wal_flags {
+    pub const ACKED: u8 = 0x01;
+    pub const IN_FLIGHT: u8 = 0x02;
+    pub const TIMED_OUT: u8 = 0x04;
+    pub const AUDIT_RECALL: u8 = 0x08;
+}
+
+/// Strictly aligned 64-byte binary header preceding every WAL record.
+/// 64-byte CPU cache-line alignment prevents split-cache-line loads during AVX-512 execution.
+#[repr(C, align(64))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
-pub struct WalEntryHeader {
+pub struct WalRecordHeader {
     /// Monotonically increasing Log Sequence Number.
     pub lsn: u64,
     /// Emission timestamp in nanoseconds since unix epoch.
-    pub timestamp_ns: u64,
+    pub timestamp_sent_ns: u64,
+    /// Engine acknowledgment timestamp (0 if in-flight or unacknowledged).
+    pub timestamp_ack_ns: u64,
     /// Target document / vector identifier.
     pub id: u64,
     /// Length of raw vector payload in bytes (must be dimension * 4 for f32).
     pub payload_len: u32,
-    /// Operation code: 1 = Insert, 2 = Upsert, 3 = Delete.
+    /// Stratified selectivity tag or cluster ID.
+    pub filter_tag: u16,
+    /// Operation code: 1 = Insert, 2 = Upsert, 3 = Delete, 4 = Search, 5 = AuditSearch.
     pub op_type: u8,
-    /// Explicit 3-byte zero padding maintaining 32-byte header boundary.
-    pub _reserved: [u8; 3],
+    /// Bitfield flags (0x1=ACK, 0x2=InFlight, 0x4=Timeout, 0x8=AuditRecall).
+    pub flags: u8,
+    /// Explicit padding to ensure 64-byte CPU cache-line alignment.
+    pub _reserved: [u8; 24],
 }
 
-impl WalEntryHeader {
+impl WalRecordHeader {
     pub const SIZE: usize = std::mem::size_of::<Self>();
 }
+
+/// Backward compatibility alias for WalRecordHeader.
+pub type WalEntryHeader = WalRecordHeader;
 
 /// High-throughput, append-only binary Write-Ahead Log writer.
 pub struct WalWriter {
@@ -96,6 +117,22 @@ impl WalWriter {
         op_type: WalOpType,
         vector: &[f32],
     ) -> Result<(), WalError> {
+        self.append_record(lsn, timestamp_ns, 0, id, 0, op_type, 0, vector)
+    }
+
+    /// Appends a fully qualified 64-byte WAL record with dispatch, ACK, and filter metadata.
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_record(
+        &mut self,
+        lsn: u64,
+        timestamp_sent_ns: u64,
+        timestamp_ack_ns: u64,
+        id: u64,
+        filter_tag: u16,
+        op_type: WalOpType,
+        flags: u8,
+        vector: &[f32],
+    ) -> Result<(), WalError> {
         if lsn <= self.current_lsn && self.current_lsn != 0 {
             return Err(WalError::NonMonotonicLsn {
                 current_lsn: self.current_lsn,
@@ -104,13 +141,16 @@ impl WalWriter {
         }
 
         let vector_bytes: &[u8] = cast_slice(vector);
-        let header = WalEntryHeader {
+        let header = WalRecordHeader {
             lsn,
-            timestamp_ns,
+            timestamp_sent_ns,
+            timestamp_ack_ns,
             id,
             payload_len: vector_bytes.len() as u32,
+            filter_tag,
             op_type: op_type as u8,
-            _reserved: [0u8; 3],
+            flags,
+            _reserved: [0u8; 24],
         };
 
         self.writer.write_all(bytes_of(&header))?;
@@ -166,9 +206,9 @@ impl WalReader {
             cutoff_lsn,
         };
 
-        let mut header_buf = [0u8; WalEntryHeader::SIZE];
+        let mut header_buf = [0u8; WalRecordHeader::SIZE];
         while self.reader.read_exact(&mut header_buf).is_ok() {
-            let header: WalEntryHeader = *bytemuck::from_bytes(&header_buf);
+            let header: WalRecordHeader = bytemuck::pod_read_unaligned(&header_buf);
             if header.lsn > cutoff_lsn {
                 break;
             }
@@ -194,6 +234,9 @@ impl WalReader {
                     snapshot.active_vectors.remove(&header.id);
                     snapshot.tombstoned_ids.push(header.id);
                 }
+                WalOpType::Search | WalOpType::AuditSearch => {
+                    // Searches do not mutate active dataset state
+                }
             }
         }
 
@@ -207,8 +250,8 @@ mod tests {
 
     #[test]
     fn test_header_size_and_alignment() {
-        assert_eq!(std::mem::size_of::<WalEntryHeader>(), 32);
-        assert_eq!(std::mem::align_of::<WalEntryHeader>(), 8);
+        assert_eq!(std::mem::size_of::<WalRecordHeader>(), 64);
+        assert_eq!(std::mem::align_of::<WalRecordHeader>(), 64);
     }
 
     #[test]

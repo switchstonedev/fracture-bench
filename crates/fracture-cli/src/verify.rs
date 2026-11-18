@@ -5,10 +5,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use fracture_adapters::VectorEngineAdapter;
+use fracture_core::arena::VectorArena;
 use fracture_core::dataset::FvecsReader;
 use fracture_core::simd::find_exact_top_k;
-use fracture_core::types::DistanceMetric;
-use fracture_core::wal::WalReader;
+use fracture_core::types::{classify_mutation, DistanceMetric, MutationLinearity};
+use fracture_core::wal::{WalOpType, WalReader};
 use fracture_pacer::workload::{WorkloadConfig, WorkloadGenerator, WorkloadType};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +21,39 @@ pub struct RecallVerificationReport {
     pub evaluated_queries: usize,
     pub mean_recall_at_k: f64,
     pub k: usize,
+}
+
+/// Audit report evaluating linearizable recall with dual-bound interval classification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinearizableRecallReport {
+    pub evaluated_queries: usize,
+    pub mean_linearizable_recall: f64,
+    pub committed_hits: usize,
+    pub inflight_neutral_hits: usize,
+    pub active_vectors_count: usize,
+    pub tombstone_count: usize,
+    pub k: usize,
+}
+
+/// Query observation capturing dual timestamps and returned candidates.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryObservation {
+    pub query_sent_ns: u64,
+    pub query_recv_ns: u64,
+    pub vector: Vec<f32>,
+    pub returned_ids: Vec<u64>,
+}
+
+/// Replay event captured from WAL.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct WalMutationEvent {
+    pub lsn: u64,
+    pub sent_ns: u64,
+    pub ack_ns: u64,
+    pub id: u64,
+    pub op: WalOpType,
+    pub vector: Vec<f32>,
 }
 
 /// Loads query vectors from an `.fvecs`, JSON file (`[[f32, ...], ...]`), or binary file (`[u32 count, u32 dim, f32...]`).
@@ -134,6 +168,85 @@ pub fn verify_wal_recall(
     })
 }
 
+/// Evaluates strict linearizable recall using dual-bound interval windowing and neutral in-flight scoring.
+pub fn verify_linearizable_wal_recall(
+    wal_mutations: &[WalMutationEvent],
+    observations: &[QueryObservation],
+    dimension: usize,
+    k: usize,
+    metric: DistanceMetric,
+) -> anyhow::Result<LinearizableRecallReport> {
+    anyhow::ensure!(!observations.is_empty(), "Observations cannot be empty");
+    anyhow::ensure!(k > 0, "Top-K must be strictly positive");
+
+    let mut arena = VectorArena::new(dimension, wal_mutations.len().max(128));
+    let mut total_linearizable_recall = 0.0;
+    let mut total_committed_hits = 0;
+    let mut total_inflight_hits = 0;
+
+    for obs in observations {
+        let mut inflight_set = HashSet::new();
+
+        for m in wal_mutations {
+            let linearity = classify_mutation(
+                m.sent_ns,
+                m.ack_ns,
+                obs.query_sent_ns,
+                obs.query_recv_ns,
+            );
+
+            match linearity {
+                MutationLinearity::Committed => match m.op {
+                    WalOpType::Insert | WalOpType::Upsert => {
+                        let _ = arena.upsert(m.id, &m.vector);
+                    }
+                    WalOpType::Delete => {
+                        let _ = arena.delete(m.id);
+                    }
+                    _ => {}
+                },
+                MutationLinearity::InFlight => {
+                    inflight_set.insert(m.id);
+                }
+                MutationLinearity::Uncommitted => {}
+            }
+        }
+
+        // Exact ground truth over visible committed arena
+        let exact_top = arena.find_top_k(&obs.vector, k, metric);
+        let exact_ids: HashSet<u64> = exact_top.into_iter().map(|(id, _)| id).collect();
+
+        let returned_ids: HashSet<u64> = obs.returned_ids.iter().take(k).copied().collect();
+
+        let mut hits = 0;
+        for &id in &returned_ids {
+            if exact_ids.contains(&id) {
+                hits += 1;
+                total_committed_hits += 1;
+            } else if inflight_set.contains(&id) {
+                // Neutral scoring rule: returned in-flight candidate is valid hit
+                hits += 1;
+                total_inflight_hits += 1;
+            }
+        }
+
+        let recall = (hits as f64) / (k as f64);
+        total_linearizable_recall += recall;
+    }
+
+    let mean_recall = total_linearizable_recall / (observations.len() as f64);
+
+    Ok(LinearizableRecallReport {
+        evaluated_queries: observations.len(),
+        mean_linearizable_recall: mean_recall,
+        committed_hits: total_committed_hits,
+        inflight_neutral_hits: total_inflight_hits,
+        active_vectors_count: arena.active_count(),
+        tombstone_count: wal_mutations.len().saturating_sub(arena.active_count()),
+        k,
+    })
+}
+
 /// Executes query search against target adapter and evaluates Recall@K against reconstructed WAL.
 pub async fn verify_with_target_adapter(
     wal_path: impl AsRef<Path>,
@@ -198,5 +311,60 @@ mod tests {
         assert_eq!(report.mean_recall_at_k, 1.0);
 
         let _ = std::fs::remove_file(wal_path);
+    }
+
+    #[test]
+    fn test_verify_linearizable_wal_recall_neutral_scoring() {
+        let mutations = vec![
+            // Committed: acked at 150 < query sent at 200
+            WalMutationEvent {
+                lsn: 1,
+                sent_ns: 50,
+                ack_ns: 150,
+                id: 10,
+                op: WalOpType::Insert,
+                vector: vec![1.0, 0.0, 0.0, 0.0],
+            },
+            // InFlight: sent at 180 <= query recv at 250, acked at 260 >= query sent at 200
+            WalMutationEvent {
+                lsn: 2,
+                sent_ns: 180,
+                ack_ns: 260,
+                id: 20,
+                op: WalOpType::Insert,
+                vector: vec![0.99, 0.01, 0.0, 0.0],
+            },
+            // Committed: acked at 190 < query sent at 200
+            WalMutationEvent {
+                lsn: 3,
+                sent_ns: 100,
+                ack_ns: 190,
+                id: 30,
+                op: WalOpType::Insert,
+                vector: vec![0.0, 1.0, 0.0, 0.0],
+            },
+        ];
+
+        // Engine returned candidate 10 (committed) and candidate 20 (in-flight)
+        let observations = vec![QueryObservation {
+            query_sent_ns: 200,
+            query_recv_ns: 250,
+            vector: vec![1.0, 0.0, 0.0, 0.0],
+            returned_ids: vec![10, 20],
+        }];
+
+        let report = verify_linearizable_wal_recall(
+            &mutations,
+            &observations,
+            4,
+            2,
+            DistanceMetric::DotProduct,
+        )
+        .unwrap();
+
+        assert_eq!(report.evaluated_queries, 1);
+        assert_eq!(report.committed_hits, 1);
+        assert_eq!(report.inflight_neutral_hits, 1);
+        assert_eq!(report.mean_linearizable_recall, 1.0);
     }
 }

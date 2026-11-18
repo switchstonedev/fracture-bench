@@ -10,6 +10,12 @@
                           "ops/cicd-pipeline",
                           "domain/jd-latex-resume-synthesizer",
                           "ops/academic-artifact-evaluation",
-                          "research/academic-artifact-evaluation"
+                          "research/academic-artifact-evaluation",
+                          "db/db-wire-protocols",
+                          "ops/linux-psi-telemetry",
+                          "qa/linearizability-audit",
+                          "domain/graph-topology-churn",
+                          "ops/tiled-simd-matrix-arenas",
+                          "projects/fracture-bench/fracture-bench-harness"
                       ]
 }

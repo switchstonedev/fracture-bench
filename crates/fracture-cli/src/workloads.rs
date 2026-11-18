@@ -14,7 +14,7 @@ mod tests {
 
         for _ in 0..10_000 {
             match gen.next_op() {
-                QueryType::Search { .. } => searches += 1,
+                QueryType::Search { .. } | QueryType::AuditSearch { .. } => searches += 1,
                 QueryType::Upsert { .. } => upserts += 1,
                 QueryType::Delete { .. } => deletes += 1,
             }

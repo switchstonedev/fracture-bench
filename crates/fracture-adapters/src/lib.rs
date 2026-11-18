@@ -34,5 +34,7 @@ pub trait VectorEngineAdapter: Send + Sync {
 pub use lancedb::{LanceDbAdapter, LanceDbConfig};
 pub use milvus::{MilvusAdapter, MilvusConfig};
 pub use mock::MockVectorAdapter;
-pub use pgvector::{PgvectorAdapter, PgvectorConfig};
+pub use pgvector::{
+    decode_pgvector_binary, encode_pgvector_binary, PgvectorAdapter, PgvectorConfig,
+};
 pub use qdrant::{QdrantAdapter, QdrantConfig};

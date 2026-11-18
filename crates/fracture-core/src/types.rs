@@ -8,10 +8,24 @@ pub enum QueryType {
         k: usize,
         filter: Option<FilterPredicate>,
     },
+    /// High-priority audit canary search tagged for offline linearizable ground-truth evaluation.
+    AuditSearch {
+        k: usize,
+        filter: Option<FilterPredicate>,
+    },
     /// Insertion or replacement of a vector embedding with an assigned document ID and embedding data.
     Upsert { id: u64, vector: Vec<f32> },
     /// Hard removal of a vector embedding by ID (HNSW tombstone generation).
     Delete { id: u64 },
+}
+
+/// 64-bit SplitMix hash mixer to decouple document ID from sequential insertion order.
+#[inline(always)]
+pub fn hash_id_seeded(id: u64, seed: u64) -> u64 {
+    let mut z = id.wrapping_add(seed).wrapping_add(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    z ^ (z >> 31)
 }
 
 /// Stratified modulo filter predicate used to calibrate selectivity cohorts.
@@ -29,7 +43,7 @@ pub enum FilterPredicate {
 }
 
 impl FilterPredicate {
-    /// Evaluates whether a given document ID satisfies the filter predicate.
+    /// Evaluates whether a given document ID satisfies the filter predicate using raw modulo.
     #[inline(always)]
     pub fn matches(&self, id: u64) -> bool {
         match self {
@@ -49,6 +63,43 @@ impl FilterPredicate {
                 target_remainder,
             } => (id % modulo) == *target_remainder,
         }
+    }
+
+    /// Evaluates filter predicate with hashed modulo to destroy sequential insertion order correlation.
+    #[inline(always)]
+    pub fn matches_hashed(&self, id: u64, seed: u64) -> bool {
+        let hashed = hash_id_seeded(id, seed);
+        self.matches(hashed)
+    }
+}
+
+/// Consistency boundary classification under open-loop concurrent mutations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MutationLinearity {
+    /// Operation was fully acknowledged prior to query dispatch (must be visible).
+    Committed,
+    /// Operation execution window overlaps query execution window (ambiguous in-flight).
+    InFlight,
+    /// Operation was dispatched after query completed (must not be visible).
+    Uncommitted,
+}
+
+/// Classifies a mutation relative to query execution boundaries.
+#[inline(always)]
+pub fn classify_mutation(
+    mutation_sent_ns: u64,
+    mutation_ack_ns: u64,
+    query_sent_ns: u64,
+    query_recv_ns: u64,
+) -> MutationLinearity {
+    if mutation_ack_ns <= query_sent_ns && mutation_ack_ns != 0 {
+        MutationLinearity::Committed
+    } else if mutation_sent_ns <= query_recv_ns
+        && (mutation_ack_ns >= query_sent_ns || mutation_ack_ns == 0)
+    {
+        MutationLinearity::InFlight
+    } else {
+        MutationLinearity::Uncommitted
     }
 }
 
@@ -87,4 +138,48 @@ pub struct VectorRecord {
     pub id: u64,
     pub vector: Vec<f32>,
     pub lsn: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_mutation_linearity() {
+        // Acked before query sent -> Committed
+        assert_eq!(
+            classify_mutation(100, 200, 300, 400),
+            MutationLinearity::Committed
+        );
+        // Overlapping execution interval -> InFlight
+        assert_eq!(
+            classify_mutation(250, 350, 300, 400),
+            MutationLinearity::InFlight
+        );
+        // In-flight without ack yet -> InFlight
+        assert_eq!(
+            classify_mutation(250, 0, 300, 400),
+            MutationLinearity::InFlight
+        );
+        // Sent strictly after query received -> Uncommitted
+        assert_eq!(
+            classify_mutation(450, 500, 300, 400),
+            MutationLinearity::Uncommitted
+        );
+    }
+
+    #[test]
+    fn test_hashed_filter_matches() {
+        let predicate = FilterPredicate::Needle {
+            modulo: 10,
+            target_remainder: 5,
+        };
+        let m1 = predicate.matches_hashed(1, 42);
+        let m2 = predicate.matches_hashed(2, 42);
+        // Hashed matches should not simply mirror sequential document IDs
+        let h1 = hash_id_seeded(1, 42) % 10;
+        let h2 = hash_id_seeded(2, 42) % 10;
+        assert_eq!(m1, h1 == 5);
+        assert_eq!(m2, h2 == 5);
+    }
 }

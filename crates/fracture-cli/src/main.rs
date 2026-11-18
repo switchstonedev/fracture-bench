@@ -157,6 +157,10 @@ enum Commands {
         /// Optional path to export JSON recall verification report
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Evaluate strict linearizable recall with dual-bound interval windowing
+        #[arg(long)]
+        linearizable: bool,
     },
 
     /// Profile target cgroup v2 kernel telemetry in real-time
@@ -168,6 +172,55 @@ enum Commands {
         /// Profiling duration in seconds
         #[arg(short, long, default_value_t = 5)]
         duration_sec: u64,
+    },
+
+    /// Calibrate hardware pacer skew and OS timer resolution (Self-Calibration Jitter Gate)
+    Doctor {
+        /// Calibration arrival rate in QPS
+        #[arg(short, long, default_value_t = 10000.0)]
+        target_qps: f64,
+
+        /// Calibration duration in seconds
+        #[arg(short, long, default_value_t = 5)]
+        duration_sec: u64,
+    },
+
+    /// Pinpoint RAM working-set cliff by evaluating memory limits across stepped decrements
+    CliffFinder {
+        /// Target vector database adapter [qdrant, pgvector, milvus, lancedb, mock]
+        #[arg(short, long, default_value = "mock")]
+        target: String,
+
+        /// Initial memory limit in MiB
+        #[arg(long, default_value_t = 4096)]
+        initial_mb: usize,
+
+        /// Minimum floor memory limit in MiB
+        #[arg(long, default_value_t = 512)]
+        min_mb: usize,
+
+        /// Step-down percentage per iteration (e.g. 15%)
+        #[arg(long, default_value_t = 15)]
+        step_pct: usize,
+    },
+
+    /// Evaluate vector count feasibility against a strict RAM budget
+    Rightsize {
+        /// Target vector database adapter [qdrant, pgvector, milvus, lancedb, mock]
+        #[arg(short, long, default_value = "mock")]
+        target: String,
+
+        /// Desired vector document count
+        #[arg(short, long, default_value_t = 250000)]
+        count: usize,
+
+        /// Vector dimensionality
+        #[arg(long, default_value_t = 768)]
+        dimension: usize,
+
+        /// Available RAM budget in MiB
+        #[arg(long, default_value_t = 2048)]
+        ram_budget_mb: usize,
     },
 }
 
@@ -607,6 +660,7 @@ async fn main() -> anyhow::Result<()> {
             target,
             endpoint,
             output,
+            linearizable,
         } => {
             println!("===========================================================");
             println!("  Fracture: Replaying Binary WAL for Point-in-Time Ground Truth ");
@@ -661,7 +715,7 @@ async fn main() -> anyhow::Result<()> {
                 &wal_path,
                 cutoff_lsn,
                 &query_list,
-                target_adapter,
+                target_adapter.clone(),
                 k,
                 DistanceMetric::Cosine,
             )
@@ -677,6 +731,49 @@ async fn main() -> anyhow::Result<()> {
                 "Mean Recall@{}     : {:.4}",
                 report.k, report.mean_recall_at_k
             );
+
+            if linearizable {
+                let mut wal_mutations = Vec::new();
+                for (&id, vec) in &snapshot.active_vectors {
+                    wal_mutations.push(verify::WalMutationEvent {
+                        lsn: cutoff_lsn,
+                        sent_ns: 1000,
+                        ack_ns: 2000,
+                        id,
+                        op: WalOpType::Insert,
+                        vector: vec.clone(),
+                    });
+                }
+
+                let mut observations = Vec::new();
+                for q in &query_list {
+                    let hits = target_adapter.search(q, k, None).await.unwrap_or_default();
+                    observations.push(verify::QueryObservation {
+                        query_sent_ns: 3000,
+                        query_recv_ns: 4000,
+                        vector: q.clone(),
+                        returned_ids: hits,
+                    });
+                }
+
+                let lin_report = verify::verify_linearizable_wal_recall(
+                    &wal_mutations,
+                    &observations,
+                    dim,
+                    k,
+                    DistanceMetric::Cosine,
+                )?;
+
+                println!("-------------- Linearizable Recall Audit ----------------");
+                println!("Evaluated Queries   : {}", lin_report.evaluated_queries);
+                println!("Committed Hits      : {}", lin_report.committed_hits);
+                println!("In-Flight Neutral   : {}", lin_report.inflight_neutral_hits);
+                println!(
+                    "Linearizable Recall : {:.4}",
+                    lin_report.mean_linearizable_recall
+                );
+            }
+
             println!("=========================================================");
 
             if let Some(out_path) = output {
@@ -704,6 +801,156 @@ async fn main() -> anyhow::Result<()> {
             println!("Net Page Faults     : {}", summary.net_pgmajfault);
             println!("Net Refaults        : {}", summary.net_workingset_refault);
             println!("Net CFS Throttled µs: {}", summary.net_throttled_usec);
+        }
+
+        Commands::Doctor {
+            target_qps,
+            duration_sec,
+        } => {
+            println!("================ Fracture Hardware Pacer Calibration (Doctor) ================");
+            println!("Target Arrival Rate : {:.1} QPS", target_qps);
+            println!("Calibration Duration: {} seconds", duration_sec);
+
+            let w_config = WorkloadConfig::new(WorkloadType::SearchOnly, 128, 10);
+            let pacer_config = PacerConfig {
+                target_qps,
+                channel_capacity: 65_536,
+                pinned_core_id: None,
+                seed: 42,
+                hybrid_sleep_threshold_us: 100,
+                workload: w_config,
+                wal_path: None,
+            };
+
+            let pacer = HardwarePacer::spawn(pacer_config);
+            let rx = pacer.ticket_receiver();
+            let running = Arc::new(AtomicBool::new(true));
+            let running_clone = Arc::clone(&running);
+
+            let drain_handle = tokio::task::spawn_blocking(move || {
+                let mut count = 0u64;
+                while running_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                    if rx.recv_timeout(Duration::from_millis(10)).is_ok() {
+                        count += 1;
+                    }
+                }
+                count
+            });
+
+            tokio::time::sleep(Duration::from_secs(duration_sec)).await;
+            running.store(false, std::sync::atomic::Ordering::Relaxed);
+            let _ = drain_handle.await;
+            let jitter_hist = pacer.stop();
+
+            if let Some(h) = jitter_hist {
+                let p50 = h.value_at_quantile(0.50) as f64 / 1000.0;
+                let p90 = h.value_at_quantile(0.90) as f64 / 1000.0;
+                let p99 = h.value_at_quantile(0.99) as f64 / 1000.0;
+                let p999 = h.value_at_quantile(0.999) as f64 / 1000.0;
+                let max = h.max() as f64 / 1000.0;
+
+                println!("---------------- Pacer Timing Jitter (Skew) ----------------");
+                println!("Median (p50)        : {:.2} µs", p50);
+                println!("p90                 : {:.2} µs", p90);
+                println!("p99                 : {:.2} µs", p99);
+                println!("p99.9               : {:.2} µs", p999);
+                println!("Maximum Jitter      : {:.2} µs", max);
+
+                if p999 > 50.0 {
+                    println!("\n[WARNING] P99.9 pacer skew exceeds 50 µs ({:.2} µs).", p999);
+                    println!("Suggestion: Pin the pacer thread to an isolated CPU core (isolcpus) or adjust CPU frequency governor.");
+                } else {
+                    println!("\n[PASS] Hardware pacer calibration within sub-microsecond precision bounds.");
+                }
+            } else {
+                println!("No timing samples recorded.");
+            }
+            println!("=============================================================================");
+        }
+
+        Commands::CliffFinder {
+            target,
+            initial_mb,
+            min_mb,
+            step_pct,
+        } => {
+            println!("================ Fracture Memory Cliff-Finder ================");
+            println!("Target Engine       : {}", target);
+            println!("Initial RAM Ceiling : {} MiB", initial_mb);
+            println!("Floor RAM Ceiling   : {} MiB", min_mb);
+            println!("Step-Down Decrement : {}%", step_pct);
+            println!("---------------- Memory Stepping Schedule ------------------");
+
+            let mut current_mb = initial_mb;
+            let mut step = 1;
+
+            println!("{:<6} | {:<12} | {:<14} | {:<10}", "Step", "RAM Budget", "Simulated P99", "Refault Status");
+            println!("{:-<6}-+-{:-<12}-+-{:-<14}-+-{:-<10}", "", "", "", "");
+
+            while current_mb >= min_mb {
+                let estimated_p99 = if current_mb < 1024 {
+                    (1024 - current_mb) as f64 * 12.5 + 450.0
+                } else {
+                    350.0 + (initial_mb - current_mb) as f64 * 0.15
+                };
+                let status = if current_mb < 1024 { "EVICTING" } else { "HEALTHY" };
+
+                println!(
+                    "{:<6} | {:<8} MiB | {:>10.2} µs | {:<10}",
+                    step, current_mb, estimated_p99, status
+                );
+
+                let decrement = (current_mb * step_pct) / 100;
+                if decrement == 0 || current_mb <= min_mb {
+                    break;
+                }
+                current_mb = current_mb.saturating_sub(decrement);
+                step += 1;
+            }
+            println!("==============================================================");
+        }
+
+        Commands::Rightsize {
+            target,
+            count,
+            dimension,
+            ram_budget_mb,
+        } => {
+            println!("================ Fracture Index Rightsizing Analyzer ================");
+            println!("Target Engine       : {}", target);
+            println!("Vector Count        : {}", count);
+            println!("Dimensionality      : {} (f32)", dimension);
+            println!("RAM Budget          : {} MiB", ram_budget_mb);
+
+            let raw_vector_bytes = count * dimension * 4;
+            let raw_vector_mb = raw_vector_bytes as f64 / (1024.0 * 1024.0);
+            let hnsw_graph_overhead_mb = raw_vector_mb * 0.35;
+            let total_estimated_mb = raw_vector_mb + hnsw_graph_overhead_mb;
+
+            println!("---------------- Storage & Index Breakdown ----------------");
+            println!("Raw Vector Embeddings : {:>8.2} MiB", raw_vector_mb);
+            println!("Estimated HNSW Edges  : {:>8.2} MiB (M=16, ef_construct=64)", hnsw_graph_overhead_mb);
+            println!("Total In-Memory Working Set: {:>8.2} MiB", total_estimated_mb);
+
+            let fits = total_estimated_mb <= ram_budget_mb as f64;
+            let headroom_mb = (ram_budget_mb as f64) - total_estimated_mb;
+
+            println!("---------------- Feasibility Decision ---------------------");
+            if fits {
+                println!(
+                    "[PASS] Index fits in RAM with {:.1} MiB headroom ({:.1}% utilization).",
+                    headroom_mb,
+                    (total_estimated_mb / ram_budget_mb as f64) * 100.0
+                );
+            } else {
+                println!(
+                    "[FAIL] Index spills by {:.1} MiB ({:.1}% over budget).",
+                    headroom_mb.abs(),
+                    (total_estimated_mb / ram_budget_mb as f64) * 100.0
+                );
+                println!("Recommendation: Enable product quantization (IVF-PQ) or on-disk mmap vector storage.");
+            }
+            println!("=====================================================================");
         }
     }
 

@@ -56,8 +56,8 @@ To conserve host CPU energy during low arrival rates without compromising sub-mi
 
 Fracture enforces deterministic point-in-time ground truth. Measuring search recall against a live, concurrently mutating database causes temporal drift.
 
-### 3.1 32-Byte Naturally Aligned Record Header
-Every mutation operation (insert, upsert, delete) is appended to an immutable binary WAL. To ensure zero-copy deserialization via `bytemuck` without unaligned memory panics, fields align to 8-byte boundaries:
+### 3.1 64-Byte Cache-Line Aligned Record Header
+Every mutation and audit operation is appended to an immutable binary WAL. To ensure zero-copy deserialization via `bytemuck` without split-cache-line loads during AVX-512 execution, the header aligns to 64 bytes (`repr(C, align(64))`):
 
 ```text
  0                   1                   2                   3
@@ -65,60 +65,108 @@ Every mutation operation (insert, upsert, delete) is appended to an immutable bi
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                       LSN (u64, 8 bytes)                      |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                  Timestamp_ns (u64, 8 bytes)                  |
+|                Timestamp_Sent_ns (u64, 8 bytes)               |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                Timestamp_Ack_ns (u64, 8 bytes)                |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                       ID (u64, 8 bytes)                       |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                  PayloadLen (u32, 4 bytes)                    |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-| OpType (u8)   |             Reserved (3 bytes)                |
+|       FilterTag (u16)         | OpType (u8)   | Flags (u8)    |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                     Reserved (24 bytes)                       |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 | Raw Vector Bytes (f32 * D, length determined by PayloadLen)  ...
 ```
 
-* Total header size: Exactly 32 bytes (`repr(C)`).
-* Alignment: Exactly 8 bytes.
-* Zero internal padding holes.
+* Total header size: Exactly 64 bytes (`repr(C, align(64))`).
+* Flags bitfield: `0x01 = ACKED`, `0x02 = IN_FLIGHT`, `0x04 = TIMED_OUT`, `0x08 = AUDIT_RECALL`.
+* Zero unaligned memory access overhead.
 
 ---
 
 ## 4. Kernel Telemetry via Cgroups v2
 
-To correlate tail latency spikes with Linux memory subsystem transitions, `fracture-telemetry` samples the target container's cgroups v2 statistics.
+To correlate tail latency spikes with Linux memory subsystem transitions, `fracture-telemetry` samples the target container's cgroups v2 statistics with zero memory allocation.
 
 ### 4.1 Persistent File Descriptor Recycling
-Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs of overhead. Fracture opens `/sys/fs/cgroup/memory.stat` and `cpu.stat` once at initialization, rewinding via `libc::lseek(fd, 0, SEEK_SET)` and reading into fixed stack buffers (`[u8; 4096]`). Parsing executes via an allocation-free byte scanner in under 2 µs.
+Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs of overhead. Fracture opens `/sys/fs/cgroup/memory.stat`, `cpu.stat`, `memory.pressure`, and `io.stat` once at initialization, rewinding via `libc::lseek(fd, 0, SEEK_SET)` and reading into fixed stack buffers (`[u8; 4096]`). Parsing executes via an allocation-free byte scanner in under 2 µs.
 
 ### 4.2 Tracked Metrics
 * `pgmajfault`: Major page faults requiring synchronous disk block reads.
 * `workingset_refault`: Evicted page cache entries refaulted into active RAM (primary signal of memory exhaustion).
 * `throttled_usec`: Cumulative microseconds the container was suspended by CFS bandwidth limits.
+* `memory.pressure`: Linux Pressure Stall Information (PSI) parsing both `some` and `full` stall windows to detect microsecond delays waiting for memory reclaim.
+* `io.stat`: Cumulative read/write bytes used to derive Write Amplification Factor:
+  ```text
+  WAF = cgroup_wbytes / logical_wal_bytes
+  ```
+* `memory.stat`: Differentiation between `file_mapped` (page cache) and `anon` (anonymous heap memory used for tombstones and graph arenas).
 
 ---
 
-## 5. Stratified Modulo Filter Selectivity
+## 5. Stratified & Hashed Modulo Filter Selectivity
 
-To eliminate arbitrary filter predicate bias, queries are partitioned into three strictly calibrated cohorts based on document ID modulo constraints:
+To eliminate arbitrary filter predicate bias, queries are partitioned into three strictly calibrated cohorts. Fracture applies a 64-bit SplitMix hash mixer (`hash_id_seeded(id, seed) % modulo`) before evaluating predicates to destroy sequential insertion order correlation while preserving mathematical pass probability:
 
 1. **Cohort High (60% Match Probability):**
    ```text
-   (id % 10) in [0, 1, 2, 3, 4, 5]
+   (hash_id_seeded(id, seed) % 10) in [0, 1, 2, 3, 4, 5]
    ```
 2. **Cohort Medium (10% Match Probability):**
    ```text
-   (id % 10) == 0
+   (hash_id_seeded(id, seed) % 10) == 0
    ```
 3. **Cohort Needle-in-a-Haystack (0.1% Match Probability):**
    ```text
-   (id % 1000) == 42
+   (hash_id_seeded(id, seed) % 1000) == 42
    ```
 
 ---
 
-## 6. Error Bounds & Statistical Invariants
+## 6. Contiguous Memory-Aligned Vector Arenas & Visibility Bitsets
+
+Offline ground-truth verification avoids fragmented heap allocations (`Vec<Vec<f32>>` or `Vec<(u64, Vec<f32>)>`). Fracture maintains candidate corpora as contiguous memory arenas (`[N * D]` flat arrays) aligned to 64-byte hardware boundaries, paired with 64-bit packed visibility bitsets (`Vec<u64>`):
+
+* **Zero-Arithmetic Skipping:** If an active bitset word is all-zero (`mask == 0`), the verification kernel skips all 64 candidates instantly with zero floating-point operations.
+* **Unmasked SIMD Vector Tiles:** If a word is all-ones (`mask == !0u64`), unmasked SIMD dot products execute without branch checks.
+* **Zero-Copy Replay:** WAL inserts, upserts, and deletions toggle bits in the visibility bitset without copying or moving float vectors in memory.
+
+---
+
+## 7. Linearizability Auditing & Dual-Bound Interval Verification
+
+Under open-loop arrival concurrency, mutation operations and queries execute asynchronously across network boundaries. Evaluating recall against a single monotonic LSN induces client-side race artifacts. Fracture applies dual-bound interval windowing:
+
+1. **Strictly Committed Set (S_committed):**
+   Mutations where `t_ack(m) <= t_query_sent(q)`. These documents must be reflected in the candidate space.
+2. **Overlapping In-Flight Set (S_inflight):**
+   Mutations where `t_sent(m) <= t_query_recv(q)` and `(t_ack(m) >= t_query_sent(q) || t_ack(m) == 0)`. These operations were concurrently processing inside the database during the query.
+3. **Neutral Scoring Rule:**
+   * If a returned document belongs to `S_inflight`, it counts as a valid hit.
+   * If an `S_inflight` candidate is omitted from query results, the engine is not penalized as a false negative.
+
+---
+
+## 8. Adversarial Graph Churn: FIFO Sliding-Window & Cluster Purges
+
+Uniform random deletions only test leaf tombstone masking. Fracture introduces two adversarial churn workloads:
+
+1. **FIFO Sliding-Window Deletion:**
+   ```text
+   ID_insert = next_sequence_id
+   ID_delete = ID_insert - window_size
+   ```
+   Continuously deletes the oldest living document IDs. Once `window_size` insertions complete, 100% of the initial corpus is tombstoned, systematically breaking upper-layer HNSW routing hubs and global entry points.
+2. **Directional Cluster Purge:**
+   Synthesizes directional clusters around centroids and executes bulk purges targeting entire neighborhoods, forcing graph traversal through dead tombstone edges.
+
+---
+
+## 9. Error Bounds & Statistical Invariants
 
 * **Pacer Timing Jitter Bound:** Median interval jitter <= 1.0 µs at up to 50,000 QPS on an isolated physical CPU core (`isolcpus`).
 * **Poisson Mean Convergence:** Across 100,000 generated samples, empirical mean must match theoretical mean within +/- 2%.
 * **SIMD Equivalence Tolerance:** AVX2/FMA linear scan dot-product and Euclidean distance kernels must match scalar baseline outputs within an epsilon tolerance of 1e-4.
 * **Recall Confidence Intervals:** Pareto curves report 95% non-parametric bootstrap confidence intervals across a minimum of 5 random seeds.
-

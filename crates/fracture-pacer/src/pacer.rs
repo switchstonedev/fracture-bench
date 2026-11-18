@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
 use fracture_core::types::{DispatchTicket, QueryType};
-use fracture_core::wal::{WalOpType, WalWriter};
+use fracture_core::wal::{wal_flags, WalOpType, WalWriter};
 use hdrhistogram::Histogram;
 use tracing::debug;
 
@@ -161,6 +161,20 @@ fn run_pacer_loop(
                         let _ = writer.append(current_lsn, elapsed_ns, *id, WalOpType::Delete, &[]);
                     }
                 }
+                QueryType::AuditSearch { .. } => {
+                    if let Some(ref mut writer) = wal_writer {
+                        let _ = writer.append_record(
+                            current_lsn,
+                            elapsed_ns,
+                            0,
+                            0,
+                            0,
+                            WalOpType::AuditSearch,
+                            wal_flags::AUDIT_RECALL,
+                            &[],
+                        );
+                    }
+                }
                 QueryType::Search { .. } => {}
             }
 
@@ -283,7 +297,10 @@ mod tests {
         if first_ticket.lsn > 0 {
             assert!(matches!(
                 first_ticket.query_type,
-                QueryType::Upsert { .. } | QueryType::Delete { .. } | QueryType::Search { .. }
+                QueryType::Upsert { .. }
+                    | QueryType::Delete { .. }
+                    | QueryType::Search { .. }
+                    | QueryType::AuditSearch { .. }
             ));
         }
 
@@ -297,6 +314,7 @@ mod tests {
                         QueryType::Upsert { .. }
                             | QueryType::Delete { .. }
                             | QueryType::Search { .. }
+                            | QueryType::AuditSearch { .. }
                     ));
                 }
             }
