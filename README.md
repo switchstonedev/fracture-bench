@@ -1,14 +1,13 @@
-# Fracture
-> High-pressure vector database benchmarking by SwitchStone
+# CruciVec
+> High-pressure vector database benchmarking under continuous mutation churn
 
-[![Crates.io](https://img.shields.io/crates/v/fracture-bench.svg)](https://crates.io/crates/fracture-bench)
-[![Documentation](https://docs.rs/fracture-bench/badge.svg)](https://docs.rs/fracture-bench)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)]()
 [![Toolchain](https://img.shields.io/badge/rust-1.75%2B-orange.svg)]()
-[![CI](https://github.com/switchstonedev/fracture-bench/actions/workflows/ci.yml/badge.svg)](https://github.com/switchstonedev/fracture-bench/actions)
+[![Venue](https://img.shields.io/badge/venue-PVLDB%202027%20Vol.%2020-purple.svg)]()
+[![Track](https://img.shields.io/badge/track-EA%26B-blue.svg)]()
 
-Fracture is an adversarial, open-loop benchmarking harness for vector search engines. It replaces synthetic "clean room" evaluations with realistic production workloads: continuous 70/20/10 mutation churn, hard deletes, HNSW graph fragmentation (dead-node tombstones), stratified metadata filtering, and strict kernel cgroups v2 memory budgets.
+CruciVec is an adversarial, open-loop benchmarking harness for vector search engines. It replaces synthetic "clean room" evaluations with realistic production workloads: continuous 70/20/10 mutation churn, hard deletes, HNSW graph fragmentation (dead-node tombstones), stratified metadata filtering, and strict kernel cgroups v2 memory budgets.
 
 ---
 
@@ -17,28 +16,28 @@ Fracture is an adversarial, open-loop benchmarking harness for vector search eng
 ```mermaid
 flowchart TD
     subgraph Host ["Shielded Benchmark Server"]
-        subgraph Core0 ["Core 0 (OS Shield)"]
+        subgraph CCD0_OS ["CCD 0 / Core 0 (OS Shield)"]
             OS[Linux Interrupts & Kernel SoftIRQs]
         end
 
-        subgraph Core1 ["Core 1 (Pacer - isolcpus)"]
-            Pacer[fracture-pacer<br/>quanta TSC + Inverse-CDF]
-            WAL[Binary WAL Writer<br/>Aligned 32B Header]
+        subgraph CCD0_Pacer ["CCD 0 / Core 1 (Pacer - isolcpus)"]
+            Pacer[crucivec-pacer<br/>quanta TSC + Inverse-CDF]
+            WAL[Binary WAL Writer<br/>64B Aligned Header on tmpfs]
         end
 
-        subgraph Cores23 ["Cores 2-3 (Client Workers)"]
+        subgraph CCD0_Workers ["CCD 0 / Cores 2-3 (Client Workers)"]
             Channel[Bounded Lock-Free Queue<br/>Saturation / Drop Accounting]
             Workers[Tokio Async Dispatchers<br/>Dual HdrHistograms]
         end
 
-        subgraph Cores47 ["Cores 4-7 (Target Cgroup v2)"]
+        subgraph CCD2_Target ["CCD 2 / Cores 16-19 (Target Cgroup v2)"]
             TargetDB[(Target Vector DB<br/>Qdrant / Milvus / pgvector / LanceDB)]
-            Telemetry[fracture-telemetry<br/>Persistent-fd /sys/fs/cgroup Scraper]
+            Telemetry[crucivec-telemetry<br/>Persistent-fd /sys/fs/cgroup Scraper]
         end
     end
 
     subgraph OfflineAnalysis ["Offline Verification & Scoring"]
-        GroundTruth[fracture verify<br/>Rayon + AVX2 Linear Scan]
+        GroundTruth[crucivec verify<br/>Dual-Bound Top-K (G_min vs G_max)<br/>Rayon + AVX2 Linear Scan]
         Report[generate_report.py<br/>Dual-CDF & Pareto Frontiers]
     end
 
@@ -53,21 +52,31 @@ flowchart TD
     GroundTruth --> Report
 ```
 
-Fracture isolates load generation, target execution, kernel telemetry, and mathematical scoring into independent subsystems to eliminate measurement perturbation:
+CruciVec isolates load generation, target execution, kernel telemetry, and mathematical scoring into independent subsystems to eliminate measurement perturbation:
 
-*   **`fracture-pacer`:** High-precision arrival scheduler running on an isolated, pinned CPU core. Uses hardware Timestamp Counter (`quanta`) to drive Poisson arrivals with sub-microsecond jitter at 50,000 QPS. Supports FIFO sliding-window and cluster-targeted adversarial churn.
-*   **`fracture-core`:** Domain types, 64-byte cache-line aligned binary Write-Ahead Log (WAL), contiguous `VectorArena` with 64-bit visibility bitset skipping, dataset readers (.fvecs, .bvecs), and dual-bound linearizability classification.
-*   **`fracture-telemetry`:** Zero-allocation Linux `/sys/fs/cgroup` parser sampling page faults, workingset refaults, CFS CPU throttling, Linux PSI (`memory.pressure`), and Write Amplification Factor (`io.stat`) in under 2 µs per sample using persistent file descriptors.
-*   **`fracture-adapters`:** Unified client trait implementations for Qdrant (gRPC/HTTP), pgvector (zero-text binary wire format code 1), Milvus, and LanceDB.
-*   **`fracture-bench`:** Main executable harness crate publishing the `fracture` CLI with `run`, `seed`, `verify`, `profile`, `doctor`, `cliff-finder`, and `rightsize` subcommands.
+*   **`crucivec-pacer`:** High-precision arrival scheduler running on an isolated, pinned CPU core (CCD 0 / Core 1). Uses hardware Timestamp Counter (`quanta`) to drive Poisson arrivals with sub-microsecond jitter at 50,000 QPS. Supports FIFO sliding-window and cluster-targeted adversarial churn.
+*   **`crucivec-core`:** Domain types, 64-byte cache-line aligned binary Write-Ahead Log (WAL), contiguous `VectorArena` with 64-bit visibility bitset skipping, dataset readers (.fvecs, .bvecs), and dual-bound linearizability top-K candidate classification ($G_{\text{min}}$ vs. $G_{\text{max}}$).
+*   **`crucivec-telemetry`:** Zero-allocation Linux `/sys/fs/cgroup` parser sampling page faults, workingset refaults, CFS CPU throttling, Linux PSI (`memory.pressure`), and Write Amplification Factor (`io.stat`) in under 2 µs per sample using persistent file descriptors.
+*   **`crucivec-adapters`:** Unified client trait implementations for Qdrant (v1.9+ gRPC/HTTP), pgvector (v0.8+ binary protocol with iterative index scans), Milvus (v2.4+ Knowhere bitset pre-filtering), and LanceDB (v0.6+ columnar disk indices).
+*   **`crucivec-cli`:** Main executable harness CLI with `run`, `seed`, `verify`, `profile`, `doctor`, `cliff-finder`, and `rightsize` subcommands.
 
 ---
 
 ## 2. Core Invariants
 
 1. **Elimination of Coordinated Omission:**
-   Fracture tracks dual histograms per worker task:
+   CruciVec tracks dual histograms per worker task:
    *   `service_time`: Network round-trip duration (t_recv - t_sent).
+   *   `total_response_time`: End-to-end response duration including schedule queuing delay (t_recv - t_intended).
+2. **Formal Dual-Bound Top-K Linearizability:**
+   Ground truth accounts for client-observed in-flight mutations:
+   *   $G_{\text{min}}(q) = \text{Top-}K(S_{\text{committed}} \setminus D_{\text{inflight}})$
+   *   $G_{\text{max}}(q) = \text{Top-}(K + |D_{\text{inflight}}|)(S_{\text{committed}} \cup I_{\text{inflight}})$
+   *   A candidate is a valid true positive iff there exists a valid serialization of concurrent operations placing it in the top-$K$.
+3. **Hardware Observer Isolation:**
+   *   Cross-CCD CPU pinning guarantees physical L3 cache isolation (32 MB private slice per CCD on AMD EPYC 7763).
+   *   Binary WAL logging is mapped to memory-backed `tmpfs` (`/mnt/wal-tmpfs`), eliminating NVMe I/O interference with target database memory paging on `/mnt/db-nvme`.
+
    *   `total_response_time`: True end-to-end latency including client queue delay (t_recv - t_intended).
 2. **Deterministic Point-in-Time Ground Truth & Dual-Bound Linearizability:**
    Ground truth is never evaluated against mutable live state. Mutations are appended to an immutable binary WAL with monotonic Log Sequence Numbers (LSNs) and ACK boundaries. Queries classify candidate spaces into `S_committed` and `S_inflight` under neutral scoring rules.
