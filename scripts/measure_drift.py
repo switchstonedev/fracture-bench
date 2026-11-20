@@ -17,12 +17,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 def find_binary(workspace_root: Path) -> Path:
-    candidates = [
-        workspace_root / "target" / "release" / "fracture.exe",
-        workspace_root / "target" / "release" / "fracture",
-        workspace_root / "target" / "debug" / "fracture.exe",
-        workspace_root / "target" / "debug" / "fracture",
-    ]
+    if sys.platform == "win32":
+        candidates = [
+            workspace_root / "target" / "release" / "fracture.exe",
+            workspace_root / "target" / "debug" / "fracture.exe",
+            workspace_root / "target" / "release" / "fracture",
+            workspace_root / "target" / "debug" / "fracture",
+        ]
+    else:
+        candidates = [
+            workspace_root / "target" / "release" / "fracture",
+            workspace_root / "target" / "debug" / "fracture",
+            workspace_root / "target" / "release" / "fracture.exe",
+            workspace_root / "target" / "debug" / "fracture.exe",
+        ]
     for c in candidates:
         if c.is_file():
             return c

@@ -87,9 +87,9 @@ pub trait TelemetryProvider: Send + Sync {
 /// Recycles persistent file descriptors via lseek + pread to achieve sub-2 µs sampling overhead.
 pub struct CgroupReader {
     #[cfg(target_os = "linux")]
-    memory_fd: std::os::unix::io::RawFd,
+    memory_fd: Option<std::os::unix::io::RawFd>,
     #[cfg(target_os = "linux")]
-    cpu_fd: std::os::unix::io::RawFd,
+    cpu_fd: Option<std::os::unix::io::RawFd>,
     #[cfg(target_os = "linux")]
     pressure_fd: Option<std::os::unix::io::RawFd>,
     #[cfg(target_os = "linux")]
@@ -100,6 +100,7 @@ pub struct CgroupReader {
 
 impl CgroupReader {
     /// Opens persistent file descriptors to the target cgroup's controllers.
+    /// Supports both pure cgroups v2 unified hierarchies and hybrid v1/v2 mount points.
     pub fn open(cgroup_dir: impl AsRef<Path>) -> Result<Self, TelemetryError> {
         let dir = cgroup_dir.as_ref();
 
@@ -108,30 +109,73 @@ impl CgroupReader {
             use std::ffi::CString;
             use std::os::unix::ffi::OsStrExt;
 
-            let mem_path = dir.join("memory.stat");
-            let cpu_path = dir.join("cpu.stat");
+            // Resolve memory.stat path:
+            // 1. Direct in dir
+            // 2. Hybrid fallback: if dir has /unified/, check /memory/
+            let mem_path = if dir.join("memory.stat").exists() {
+                Some(dir.join("memory.stat"))
+            } else {
+                let dir_str = dir.to_string_lossy();
+                if dir_str.contains("/unified/") {
+                    let hybrid = PathBuf::from(dir_str.replace("/unified/", "/memory/"));
+                    if hybrid.join("memory.stat").exists() {
+                        Some(hybrid.join("memory.stat"))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            };
 
-            if !mem_path.exists() || !cpu_path.exists() {
+            // Resolve cpu.stat path:
+            // 1. Direct in dir
+            // 2. Hybrid fallback: if dir has /memory/, check /unified/
+            let cpu_path = if dir.join("cpu.stat").exists() {
+                Some(dir.join("cpu.stat"))
+            } else {
+                let dir_str = dir.to_string_lossy();
+                if dir_str.contains("/memory/") {
+                    let hybrid = PathBuf::from(dir_str.replace("/memory/", "/unified/"));
+                    if hybrid.join("cpu.stat").exists() {
+                        Some(hybrid.join("cpu.stat"))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            };
+
+            if mem_path.is_none() && cpu_path.is_none() {
                 return Err(TelemetryError::InvalidCgroupPath(dir.to_path_buf()));
             }
 
-            let mem_c = CString::new(mem_path.as_os_str().as_bytes())
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
-            let cpu_c = CString::new(cpu_path.as_os_str().as_bytes())
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
-
-            let memory_fd = unsafe { libc::open(mem_c.as_ptr(), libc::O_RDONLY) };
-            if memory_fd < 0 {
-                return Err(TelemetryError::Io(std::io::Error::last_os_error()));
-            }
-
-            let cpu_fd = unsafe { libc::open(cpu_c.as_ptr(), libc::O_RDONLY) };
-            if cpu_fd < 0 {
-                unsafe {
-                    libc::close(memory_fd);
+            let memory_fd = if let Some(ref mp) = mem_path {
+                let mem_c = CString::new(mp.as_os_str().as_bytes())
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+                let fd = unsafe { libc::open(mem_c.as_ptr(), libc::O_RDONLY) };
+                if fd >= 0 {
+                    Some(fd)
+                } else {
+                    None
                 }
-                return Err(TelemetryError::Io(std::io::Error::last_os_error()));
-            }
+            } else {
+                None
+            };
+
+            let cpu_fd = if let Some(ref cp) = cpu_path {
+                let cpu_c = CString::new(cp.as_os_str().as_bytes())
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+                let fd = unsafe { libc::open(cpu_c.as_ptr(), libc::O_RDONLY) };
+                if fd >= 0 {
+                    Some(fd)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
 
             // Optional pressure and io controllers
             let pressure_path = dir.join("memory.pressure");
@@ -189,43 +233,51 @@ impl CgroupReader {
         {
             let mut buf = [0u8; 4096];
 
-            // 1. Read memory.stat
-            unsafe {
-                libc::lseek(self.memory_fd, 0, libc::SEEK_SET);
-            }
-            let bytes_read = unsafe {
-                libc::read(
-                    self.memory_fd,
-                    buf.as_mut_ptr() as *mut libc::c_void,
-                    buf.len(),
-                )
+            // 1. Read memory.stat if available
+            let (pgmajfault, workingset_refault, file_mapped, anon, slab) = if let Some(mem_fd) =
+                self.memory_fd
+            {
+                unsafe {
+                    libc::lseek(mem_fd, 0, libc::SEEK_SET);
+                }
+                let bytes_read =
+                    unsafe { libc::read(mem_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+                if bytes_read > 0 {
+                    let mem_slice = &buf[..bytes_read as usize];
+                    (
+                        parse_stat_val(mem_slice, b"pgmajfault").unwrap_or(0),
+                        parse_stat_val(mem_slice, b"workingset_refault").unwrap_or(0),
+                        parse_stat_val(mem_slice, b"file_mapped")
+                            .or_else(|| parse_stat_val(mem_slice, b"mapped_file"))
+                            .unwrap_or(0),
+                        parse_stat_val(mem_slice, b"anon")
+                            .or_else(|| parse_stat_val(mem_slice, b"rss"))
+                            .unwrap_or(0),
+                        parse_stat_val(mem_slice, b"slab").unwrap_or(0),
+                    )
+                } else {
+                    (0, 0, 0, 0, 0)
+                }
+            } else {
+                (0, 0, 0, 0, 0)
             };
-            if bytes_read <= 0 {
-                return Err(TelemetryError::Io(std::io::Error::last_os_error()));
-            }
-            let mem_slice = &buf[..bytes_read as usize];
-            let pgmajfault = parse_stat_val(mem_slice, b"pgmajfault").unwrap_or(0);
-            let workingset_refault = parse_stat_val(mem_slice, b"workingset_refault").unwrap_or(0);
-            let file_mapped = parse_stat_val(mem_slice, b"file_mapped").unwrap_or(0);
-            let anon = parse_stat_val(mem_slice, b"anon").unwrap_or(0);
-            let slab = parse_stat_val(mem_slice, b"slab").unwrap_or(0);
 
-            // 2. Read cpu.stat
-            unsafe {
-                libc::lseek(self.cpu_fd, 0, libc::SEEK_SET);
-            }
-            let bytes_read_cpu = unsafe {
-                libc::read(
-                    self.cpu_fd,
-                    buf.as_mut_ptr() as *mut libc::c_void,
-                    buf.len(),
-                )
+            // 2. Read cpu.stat if available
+            let throttled_usec = if let Some(cpu_fd) = self.cpu_fd {
+                unsafe {
+                    libc::lseek(cpu_fd, 0, libc::SEEK_SET);
+                }
+                let bytes_read_cpu =
+                    unsafe { libc::read(cpu_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
+                if bytes_read_cpu > 0 {
+                    let cpu_slice = &buf[..bytes_read_cpu as usize];
+                    parse_stat_val(cpu_slice, b"throttled_usec").unwrap_or(0)
+                } else {
+                    0
+                }
+            } else {
+                0
             };
-            if bytes_read_cpu <= 0 {
-                return Err(TelemetryError::Io(std::io::Error::last_os_error()));
-            }
-            let cpu_slice = &buf[..bytes_read_cpu as usize];
-            let throttled_usec = parse_stat_val(cpu_slice, b"throttled_usec").unwrap_or(0);
 
             // 3. Read memory.pressure if available
             let psi = if let Some(p_fd) = self.pressure_fd {
@@ -305,8 +357,12 @@ impl TelemetryProvider for CgroupReader {
 impl Drop for CgroupReader {
     fn drop(&mut self) {
         unsafe {
-            libc::close(self.memory_fd);
-            libc::close(self.cpu_fd);
+            if let Some(m_fd) = self.memory_fd {
+                libc::close(m_fd);
+            }
+            if let Some(c_fd) = self.cpu_fd {
+                libc::close(c_fd);
+            }
             if let Some(p_fd) = self.pressure_fd {
                 libc::close(p_fd);
             }
@@ -434,9 +490,19 @@ mod tests {
 
     #[test]
     fn test_cgroup_reader_cross_platform() {
-        let mut reader = CgroupReader::open(".").expect("Failed to open mock/test cgroups");
+        let temp_dir = std::env::temp_dir().join(format!("cgroup_test_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::write(
+            temp_dir.join("memory.stat"),
+            b"pgmajfault 42\nworkingset_refault 10\n",
+        )
+        .unwrap();
+        std::fs::write(temp_dir.join("cpu.stat"), b"throttled_usec 500\n").unwrap();
+
+        let mut reader = CgroupReader::open(&temp_dir).expect("Failed to open mock/test cgroups");
         let stats = reader.sample().expect("Failed to sample statistics");
-        assert!(stats.pgmajfault > 0 || cfg!(target_os = "linux"));
+        assert!(stats.pgmajfault > 0 || cfg!(not(target_os = "linux")));
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 
     #[test]

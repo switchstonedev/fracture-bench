@@ -46,12 +46,20 @@ def find_binary(workspace_root: Path, custom_path: Optional[str] = None) -> Path
             return p
         raise FileNotFoundError(f"Specified binary not found: {custom_path}")
 
-    candidates = [
-        workspace_root / "target" / "release" / "fracture.exe",
-        workspace_root / "target" / "release" / "fracture",
-        workspace_root / "target" / "debug" / "fracture.exe",
-        workspace_root / "target" / "debug" / "fracture",
-    ]
+    if sys.platform == "win32":
+        candidates = [
+            workspace_root / "target" / "release" / "fracture.exe",
+            workspace_root / "target" / "debug" / "fracture.exe",
+            workspace_root / "target" / "release" / "fracture",
+            workspace_root / "target" / "debug" / "fracture",
+        ]
+    else:
+        candidates = [
+            workspace_root / "target" / "release" / "fracture",
+            workspace_root / "target" / "debug" / "fracture",
+            workspace_root / "target" / "release" / "fracture.exe",
+            workspace_root / "target" / "debug" / "fracture.exe",
+        ]
     for c in candidates:
         if c.is_file():
             return c

@@ -37,15 +37,47 @@ pub struct LanceDbAdapter {
 
 impl LanceDbAdapter {
     pub fn new(config: LanceDbConfig) -> Self {
+        let dir = PathBuf::from(&config.uri);
+        let data_path = dir.join(format!("{}.vectors.json", config.table_name));
+        let vectors = if data_path.is_file() {
+            if let Ok(file) = fs::File::open(&data_path) {
+                serde_json::from_reader(file).unwrap_or_default()
+            } else {
+                HashMap::new()
+            }
+        } else {
+            HashMap::new()
+        };
+
         Self {
             config,
-            vectors: RwLock::new(HashMap::new()),
+            vectors: RwLock::new(vectors),
             metric: RwLock::new(DistanceMetric::Cosine),
         }
     }
 
     fn table_path(&self) -> PathBuf {
         PathBuf::from(&self.config.uri).join(format!("{}.lance", self.config.table_name))
+    }
+
+    fn data_path(&self) -> PathBuf {
+        PathBuf::from(&self.config.uri).join(format!("{}.vectors.json", self.config.table_name))
+    }
+
+    fn persist_vectors(&self) -> anyhow::Result<()> {
+        let dir = PathBuf::from(&self.config.uri);
+        let _ = fs::create_dir_all(&dir);
+        let data_path = self.data_path();
+        let vecs = self.vectors.read().unwrap();
+        if let Ok(file) = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(data_path)
+        {
+            let _ = serde_json::to_writer(file, &*vecs);
+        }
+        Ok(())
     }
 }
 
@@ -61,9 +93,11 @@ impl VectorEngineAdapter for LanceDbAdapter {
         let mut vecs = self.vectors.write().unwrap();
         vecs.clear();
 
-        // Clear existing table file on init
+        // Clear existing table file and vector snapshot on init
         let path = self.table_path();
         let _ = fs::remove_file(path);
+        let data_path = self.data_path();
+        let _ = fs::remove_file(data_path);
 
         Ok(())
     }
@@ -79,6 +113,7 @@ impl VectorEngineAdapter for LanceDbAdapter {
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
             let _ = writeln!(file, "UPSERT {} {}", id, vector.len());
         }
+        let _ = self.persist_vectors();
 
         Ok(())
     }
@@ -101,6 +136,7 @@ impl VectorEngineAdapter for LanceDbAdapter {
                 let _ = writeln!(file, "UPSERT {} {}", id, vec.len());
             }
         }
+        let _ = self.persist_vectors();
 
         Ok(())
     }
@@ -115,6 +151,7 @@ impl VectorEngineAdapter for LanceDbAdapter {
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
             let _ = writeln!(file, "DELETE {}", id);
         }
+        let _ = self.persist_vectors();
 
         Ok(())
     }
@@ -191,6 +228,19 @@ mod tests {
         adapter.delete(1).await.unwrap();
         let res_after = adapter.search(&[1.0, 0.0, 0.0], 2, None).await.unwrap();
         assert_eq!(res_after[0], 3);
+
+        // Verify second adapter instance reloads persisted vectors from disk
+        let adapter_reloaded = LanceDbAdapter::new(LanceDbConfig {
+            uri: temp_dir.to_str().unwrap().to_string(),
+            table_name: "test_coll".to_string(),
+        });
+        let res_reloaded = adapter_reloaded
+            .search(&[1.0, 0.0, 0.0], 2, None)
+            .await
+            .unwrap();
+        assert_eq!(res_reloaded.len(), 2);
+        assert_eq!(res_reloaded[0], 3);
+        assert_eq!(res_reloaded[1], 2);
 
         let _ = fs::remove_dir_all(temp_dir);
     }
