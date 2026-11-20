@@ -138,7 +138,11 @@ impl CgroupReader {
             let pressure_fd = if pressure_path.exists() {
                 if let Ok(p_c) = CString::new(pressure_path.as_os_str().as_bytes()) {
                     let fd = unsafe { libc::open(p_c.as_ptr(), libc::O_RDONLY) };
-                    if fd >= 0 { Some(fd) } else { None }
+                    if fd >= 0 {
+                        Some(fd)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -150,7 +154,11 @@ impl CgroupReader {
             let io_fd = if io_path.exists() {
                 if let Ok(io_c) = CString::new(io_path.as_os_str().as_bytes()) {
                     let fd = unsafe { libc::open(io_c.as_ptr(), libc::O_RDONLY) };
-                    if fd >= 0 { Some(fd) } else { None }
+                    if fd >= 0 {
+                        Some(fd)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -224,9 +232,8 @@ impl CgroupReader {
                 unsafe {
                     libc::lseek(p_fd, 0, libc::SEEK_SET);
                 }
-                let bytes_p = unsafe {
-                    libc::read(p_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
-                };
+                let bytes_p =
+                    unsafe { libc::read(p_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
                 if bytes_p > 0 {
                     parse_memory_pressure(&buf[..bytes_p as usize]).unwrap_or_default()
                 } else {
@@ -241,9 +248,8 @@ impl CgroupReader {
                 unsafe {
                     libc::lseek(i_fd, 0, libc::SEEK_SET);
                 }
-                let bytes_io = unsafe {
-                    libc::read(i_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
-                };
+                let bytes_io =
+                    unsafe { libc::read(i_fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len()) };
                 if bytes_io > 0 {
                     parse_io_stat(&buf[..bytes_io as usize])
                 } else {
@@ -421,10 +427,7 @@ mod tests {
     fn test_parse_stat_val() {
         let sample = b"pgmajfault 42\nworkingset_refault 1024\nthrottled_usec 5000\n";
         assert_eq!(parse_stat_val(sample, b"pgmajfault"), Some(42));
-        assert_eq!(
-            parse_stat_val(sample, b"workingset_refault"),
-            Some(1024)
-        );
+        assert_eq!(parse_stat_val(sample, b"workingset_refault"), Some(1024));
         assert_eq!(parse_stat_val(sample, b"throttled_usec"), Some(5000));
         assert_eq!(parse_stat_val(sample, b"nonexistent"), None);
     }

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use crate::simd::{cosine_distance, dot_product, euclidean_distance_sq};
 use crate::types::DistanceMetric;
-use crate::simd::{dot_product, euclidean_distance_sq, cosine_distance};
+use std::collections::HashMap;
 
 /// Contiguous memory-aligned vector arena with 64-bit active visibility bitsets.
 /// Implements cache-blocked batch retrieval over contiguous buffers, avoiding heap fragmentation.
@@ -103,13 +103,14 @@ impl VectorArena {
 
         let dim = self.dimension;
         for (word_idx, &mask) in self.visibility.iter().enumerate() {
-            if mask == 0 {
-                // Skip entire block of 64 tombstoned candidates zero-copy
-                continue;
-            }
-
             let start_idx = word_idx * 64;
             let end_idx = (start_idx + 64).min(self.count);
+
+            if mask == 0 {
+                // Entire block of 64 candidates is tombstoned: mark all as NEG_INFINITY zero-copy
+                out_scores[start_idx..end_idx].fill(f32::NEG_INFINITY);
+                continue;
+            }
 
             for i in start_idx..end_idx {
                 let bit = 1u64 << (i % 64);
@@ -126,12 +127,7 @@ impl VectorArena {
     }
 
     /// Finds exact top-K nearest neighbors over visible candidates.
-    pub fn find_top_k(
-        &self,
-        query: &[f32],
-        k: usize,
-        metric: DistanceMetric,
-    ) -> Vec<(u64, f32)> {
+    pub fn find_top_k(&self, query: &[f32], k: usize, metric: DistanceMetric) -> Vec<(u64, f32)> {
         if k == 0 || self.count == 0 {
             return Vec::new();
         }
@@ -166,11 +162,15 @@ impl VectorArena {
         match metric {
             DistanceMetric::DotProduct => {
                 // Higher dot product is better
-                scored.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored.sort_unstable_by(|a, b| {
+                    b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
             DistanceMetric::Euclidean | DistanceMetric::Cosine => {
                 // Lower distance is better
-                scored.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored.sort_unstable_by(|a, b| {
+                    a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
         }
 
@@ -182,6 +182,7 @@ impl VectorArena {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn test_vector_arena_crud_and_bitset_skipping() {
@@ -210,5 +211,95 @@ mod tests {
         let top_after = arena.find_top_k(&[1.0, 0.0, 0.0, 0.0], 2, DistanceMetric::DotProduct);
         assert_eq!(top_after.len(), 2);
         assert_ne!(top_after[0].0, 10);
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(30))]
+        #[test]
+        fn test_proptest_simd_bitset_skipping_matches_scalar_with_random_tombstones(
+            dim in proptest::sample::select(vec![4usize, 8, 16, 32, 64]),
+            num_vectors in 10usize..=80usize,
+            tombstone_pct in 0u32..=100u32,
+            k in 1usize..=10usize,
+            raw_floats in proptest::collection::vec(-10.0f32..10.0f32, 80 * 64),
+            query_floats in proptest::collection::vec(-10.0f32..10.0f32, 64),
+        ) {
+            let query = &query_floats[0..dim];
+            let mut arena = VectorArena::new(dim, num_vectors);
+            let mut deleted_ids = std::collections::HashSet::new();
+            let mut active_records = Vec::new();
+
+            for i in 0..num_vectors {
+                let id = (i as u64) + 1;
+                let offset = i * dim;
+                let vec_slice = &raw_floats[offset..offset + dim];
+                arena.upsert(id, vec_slice).unwrap();
+
+                // Deterministically decide tombstone based on percentage
+                if ((id * 37) % 100) < (tombstone_pct as u64) {
+                    arena.delete(id);
+                    deleted_ids.insert(id);
+                } else {
+                    active_records.push((id, vec_slice.to_vec()));
+                }
+            }
+
+            prop_assert_eq!(arena.active_count(), active_records.len());
+
+            // 1. Check score_query against scalar dot product
+            let mut scores = vec![0.0f32; num_vectors];
+            arena.score_query(query, &mut scores).unwrap();
+
+            for i in 0..num_vectors {
+                let id = (i as u64) + 1;
+                if deleted_ids.contains(&id) {
+                    prop_assert_eq!(scores[i], f32::NEG_INFINITY);
+                    prop_assert!(!arena.is_visible(id));
+                } else {
+                    let offset = i * dim;
+                    let vec_slice = &raw_floats[offset..offset + dim];
+                    let scalar_dot = crate::simd::neon::dot_product_scalar(query, vec_slice);
+                    let diff = (scores[i] - scalar_dot).abs();
+                    let rel_diff = diff / scalar_dot.abs().max(1.0);
+                    prop_assert!(rel_diff < 1e-4 || diff < 1e-3, "Dot product tolerance exceeded: diff={}, rel_diff={}", diff, rel_diff);
+                    prop_assert!(arena.is_visible(id));
+                }
+            }
+
+            // 2. Check find_top_k for DotProduct
+            let top_k_dot = arena.find_top_k(query, k, DistanceMetric::DotProduct);
+            for (ret_id, _) in &top_k_dot {
+                prop_assert!(!deleted_ids.contains(ret_id), "Tombstoned ID {:?} returned in top-k!", ret_id);
+            }
+
+            // 3. Check find_top_k for Euclidean
+            let top_k_l2 = arena.find_top_k(query, k, DistanceMetric::Euclidean);
+            for (ret_id, _) in &top_k_l2 {
+                prop_assert!(!deleted_ids.contains(ret_id), "Tombstoned ID {:?} returned in Euclidean top-k!", ret_id);
+            }
+
+            // Compare top_k_l2 scores with scalar euclidean distance
+            if !active_records.is_empty() {
+                let mut scalar_l2_scored: Vec<(u64, f32)> = active_records
+                    .iter()
+                    .map(|(id, vec)| (*id, crate::simd::neon::euclidean_distance_sq_scalar(query, vec)))
+                    .collect();
+                scalar_l2_scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                let expected_len = k.min(active_records.len());
+                prop_assert_eq!(top_k_l2.len(), expected_len);
+
+                for (idx, (ret_id, ret_score)) in top_k_l2.iter().enumerate() {
+                    let (exp_id, exp_score) = scalar_l2_scored[idx];
+                    let diff = (*ret_score - exp_score).abs();
+                    let rel_diff = diff / exp_score.abs().max(1.0);
+                    prop_assert!(rel_diff < 1e-4 || diff < 1e-3, "Euclidean tolerance exceeded: diff={}, rel_diff={}", diff, rel_diff);
+                    if rel_diff < 1e-5 {
+                        prop_assert_eq!(*ret_id, exp_id);
+                    }
+                }
+            } else {
+                prop_assert!(top_k_l2.is_empty());
+            }
+        }
     }
 }

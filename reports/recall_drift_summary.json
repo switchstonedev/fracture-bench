@@ -19,13 +19,13 @@
   },
   {
     "cutoff_lsn": 240,
-    "active_vectors": 200,
+    "active_vectors": 240,
     "tombstone_count": 0,
     "mean_recall_at_10": 1.0
   },
   {
     "cutoff_lsn": 300,
-    "active_vectors": 200,
+    "active_vectors": 300,
     "tombstone_count": 0,
     "mean_recall_at_10": 1.0
   }

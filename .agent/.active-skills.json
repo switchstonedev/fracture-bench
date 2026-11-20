@@ -16,6 +16,9 @@
                           "qa/linearizability-audit",
                           "domain/graph-topology-churn",
                           "ops/tiled-simd-matrix-arenas",
-                          "projects/fracture-bench/fracture-bench-harness"
+                          "projects/fracture-bench/fracture-bench-harness",
+                          "ops/docker",
+                          "arch/c4-design",
+                          "db/sql-redis"
                       ]
 }

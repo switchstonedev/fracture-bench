@@ -188,12 +188,8 @@ pub fn verify_linearizable_wal_recall(
         let mut inflight_set = HashSet::new();
 
         for m in wal_mutations {
-            let linearity = classify_mutation(
-                m.sent_ns,
-                m.ack_ns,
-                obs.query_sent_ns,
-                obs.query_recv_ns,
-            );
+            let linearity =
+                classify_mutation(m.sent_ns, m.ack_ns, obs.query_sent_ns, obs.query_recv_ns);
 
             match linearity {
                 MutationLinearity::Committed => match m.op {
@@ -366,5 +362,173 @@ mod tests {
         assert_eq!(report.committed_hits, 1);
         assert_eq!(report.inflight_neutral_hits, 1);
         assert_eq!(report.mean_linearizable_recall, 1.0);
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(40))]
+        #[test]
+        fn test_proptest_linearizer_zero_false_negatives_and_wal_roundtrip(
+            query_sent_ns in 500u64..=1500u64,
+            query_duration in 20u64..=200u64,
+            num_ops in 15usize..=50usize,
+            op_choices in proptest::collection::vec((1u64..=15u64, 0u8..=2u8, 100u64..=2000u64, proptest::bool::ANY, 10u64..=300u64), 50),
+        ) {
+            use std::collections::HashMap;
+
+            let query_recv_ns = query_sent_ns + query_duration;
+            let mut mutations = Vec::with_capacity(num_ops);
+            let mut ref_map: HashMap<u64, Vec<f32>> = HashMap::new();
+            let mut inflight_ids = HashSet::new();
+
+            for (idx, (doc_id, op_code, sent_ns, is_acked, lat_ns)) in op_choices.into_iter().take(num_ops).enumerate() {
+                let lsn = (idx as u64) + 1;
+                let ack_ns = if is_acked { sent_ns + lat_ns } else { 0 };
+                let op = match op_code {
+                    0 => WalOpType::Insert,
+                    1 => WalOpType::Upsert,
+                    _ => WalOpType::Delete,
+                };
+                let vec = vec![(doc_id as f32) * 0.1, 0.5, 0.2, 0.1];
+
+                mutations.push(WalMutationEvent {
+                    lsn,
+                    sent_ns,
+                    ack_ns,
+                    id: doc_id,
+                    op,
+                    vector: vec.clone(),
+                });
+
+                let linearity = classify_mutation(sent_ns, ack_ns, query_sent_ns, query_recv_ns);
+                match linearity {
+                    MutationLinearity::Committed => {
+                        match op {
+                            WalOpType::Insert | WalOpType::Upsert => {
+                                ref_map.insert(doc_id, vec);
+                            }
+                            WalOpType::Delete => {
+                                ref_map.remove(&doc_id);
+                            }
+                            _ => {}
+                        }
+                    }
+                    MutationLinearity::InFlight => {
+                        inflight_ids.insert(doc_id);
+                    }
+                    MutationLinearity::Uncommitted => {
+                        proptest::prop_assert!(sent_ns > query_recv_ns || (sent_ns > query_sent_ns && ack_ns == 0 && sent_ns > query_recv_ns));
+                    }
+                }
+            }
+
+            // Test 1: Oracle committed candidate space match
+            let query_vec = vec![1.0, 0.0, 0.0, 0.0];
+
+            // Score oracle reference map to find top committed candidates
+            let mut scored_ref: Vec<(u64, f32)> = ref_map
+                .iter()
+                .map(|(id, v)| (*id, fracture_core::simd::dot_product(&query_vec, v)))
+                .collect();
+            scored_ref.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            let returned_ids: Vec<u64> = scored_ref.into_iter().take(5).map(|(id, _)| id).collect();
+            let k = returned_ids.len().max(1);
+
+            let obs = vec![QueryObservation {
+                query_sent_ns,
+                query_recv_ns,
+                vector: query_vec,
+                returned_ids: returned_ids.clone(),
+            }];
+
+            let report = verify_linearizable_wal_recall(
+                &mutations,
+                &obs,
+                4,
+                k,
+                DistanceMetric::DotProduct,
+            ).unwrap();
+
+            // Verification Invariant A: Active committed count matches reference map exactly
+            proptest::prop_assert_eq!(report.active_vectors_count, ref_map.len());
+
+            // Verification Invariant B: Zero false negatives
+            // Every returned document from top committed nearest neighbors is acknowledged as a committed hit
+            proptest::prop_assert_eq!(report.committed_hits, returned_ids.len());
+            if !returned_ids.is_empty() {
+                proptest::prop_assert_eq!(report.mean_linearizable_recall, 1.0);
+            }
+
+            // Test 2: In-flight candidate neutral scoring
+            if let Some(&inflight_id) = inflight_ids.iter().next() {
+                let obs_inflight = vec![QueryObservation {
+                    query_sent_ns,
+                    query_recv_ns,
+                    vector: vec![1.0, 0.0, 0.0, 0.0],
+                    returned_ids: vec![inflight_id],
+                }];
+
+                let inf_report = verify_linearizable_wal_recall(
+                    &mutations,
+                    &obs_inflight,
+                    4,
+                    1,
+                    DistanceMetric::DotProduct,
+                ).unwrap();
+
+                // If candidate is in flight, it counts as a valid hit (neutral scoring rule)
+                proptest::prop_assert!(inf_report.inflight_neutral_hits >= 1 || inf_report.committed_hits >= 1);
+                proptest::prop_assert_eq!(inf_report.mean_linearizable_recall, 1.0);
+            }
+
+            // Test 3: Binary WAL persistence & point-in-time reconstruction roundtrip fuzzing
+            let unique_id = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let wal_path = std::env::temp_dir().join(format!("proptest_wal_{}_{}.wal", query_sent_ns, unique_id));
+            let _ = std::fs::remove_file(&wal_path);
+
+            {
+                let mut writer = WalWriter::open(&wal_path).unwrap();
+                for m in &mutations {
+                    writer.append_record(
+                        m.lsn,
+                        m.sent_ns,
+                        m.ack_ns,
+                        m.id,
+                        0,
+                        m.op,
+                        0,
+                        &m.vector,
+                    ).unwrap();
+                }
+                writer.flush().unwrap();
+            }
+
+            let mut reader = WalReader::open(&wal_path).unwrap();
+            let cutoff_lsn = (num_ops as u64) / 2;
+            let snapshot = reader.reconstruct_state(cutoff_lsn).unwrap();
+
+            // Reconstruct reference oracle up to cutoff_lsn
+            let mut oracle_active = HashMap::new();
+            for m in mutations.iter().take_while(|m| m.lsn <= cutoff_lsn) {
+                match m.op {
+                    WalOpType::Insert | WalOpType::Upsert => {
+                        oracle_active.insert(m.id, m.vector.clone());
+                    }
+                    WalOpType::Delete => {
+                        oracle_active.remove(&m.id);
+                    }
+                    _ => {}
+                }
+            }
+
+            proptest::prop_assert_eq!(snapshot.active_vectors.len(), oracle_active.len());
+            for (id, vec) in &oracle_active {
+                proptest::prop_assert_eq!(snapshot.active_vectors.get(id), Some(vec));
+            }
+
+            let _ = std::fs::remove_file(wal_path);
+        }
     }
 }

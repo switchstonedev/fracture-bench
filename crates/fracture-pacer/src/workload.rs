@@ -174,7 +174,8 @@ impl WorkloadGenerator {
                 None
             };
 
-            let is_canary = self.audit_canary_rate > 0.0 && self.rng.gen::<f64>() < self.audit_canary_rate;
+            let is_canary =
+                self.audit_canary_rate > 0.0 && self.rng.gen::<f64>() < self.audit_canary_rate;
             if is_canary {
                 QueryType::AuditSearch {
                     k: self.top_k,

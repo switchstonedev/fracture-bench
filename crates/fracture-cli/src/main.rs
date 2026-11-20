@@ -807,7 +807,9 @@ async fn main() -> anyhow::Result<()> {
             target_qps,
             duration_sec,
         } => {
-            println!("================ Fracture Hardware Pacer Calibration (Doctor) ================");
+            println!(
+                "================ Fracture Hardware Pacer Calibration (Doctor) ================"
+            );
             println!("Target Arrival Rate : {:.1} QPS", target_qps);
             println!("Calibration Duration: {} seconds", duration_sec);
 
@@ -857,7 +859,10 @@ async fn main() -> anyhow::Result<()> {
                 println!("Maximum Jitter      : {:.2} µs", max);
 
                 if p999 > 50.0 {
-                    println!("\n[WARNING] P99.9 pacer skew exceeds 50 µs ({:.2} µs).", p999);
+                    println!(
+                        "\n[WARNING] P99.9 pacer skew exceeds 50 µs ({:.2} µs).",
+                        p999
+                    );
                     println!("Suggestion: Pin the pacer thread to an isolated CPU core (isolcpus) or adjust CPU frequency governor.");
                 } else {
                     println!("\n[PASS] Hardware pacer calibration within sub-microsecond precision bounds.");
@@ -865,7 +870,9 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 println!("No timing samples recorded.");
             }
-            println!("=============================================================================");
+            println!(
+                "============================================================================="
+            );
         }
 
         Commands::CliffFinder {
@@ -884,7 +891,10 @@ async fn main() -> anyhow::Result<()> {
             let mut current_mb = initial_mb;
             let mut step = 1;
 
-            println!("{:<6} | {:<12} | {:<14} | {:<10}", "Step", "RAM Budget", "Simulated P99", "Refault Status");
+            println!(
+                "{:<6} | {:<12} | {:<14} | {:<10}",
+                "Step", "RAM Budget", "Simulated P99", "Refault Status"
+            );
             println!("{:-<6}-+-{:-<12}-+-{:-<14}-+-{:-<10}", "", "", "", "");
 
             while current_mb >= min_mb {
@@ -893,7 +903,11 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     350.0 + (initial_mb - current_mb) as f64 * 0.15
                 };
-                let status = if current_mb < 1024 { "EVICTING" } else { "HEALTHY" };
+                let status = if current_mb < 1024 {
+                    "EVICTING"
+                } else {
+                    "HEALTHY"
+                };
 
                 println!(
                     "{:<6} | {:<8} MiB | {:>10.2} µs | {:<10}",
@@ -929,8 +943,14 @@ async fn main() -> anyhow::Result<()> {
 
             println!("---------------- Storage & Index Breakdown ----------------");
             println!("Raw Vector Embeddings : {:>8.2} MiB", raw_vector_mb);
-            println!("Estimated HNSW Edges  : {:>8.2} MiB (M=16, ef_construct=64)", hnsw_graph_overhead_mb);
-            println!("Total In-Memory Working Set: {:>8.2} MiB", total_estimated_mb);
+            println!(
+                "Estimated HNSW Edges  : {:>8.2} MiB (M=16, ef_construct=64)",
+                hnsw_graph_overhead_mb
+            );
+            println!(
+                "Total In-Memory Working Set: {:>8.2} MiB",
+                total_estimated_mb
+            );
 
             let fits = total_estimated_mb <= ram_budget_mb as f64;
             let headroom_mb = (ram_budget_mb as f64) - total_estimated_mb;
