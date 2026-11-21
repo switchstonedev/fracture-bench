@@ -145,7 +145,8 @@ def main():
     # Step 2: Run Benchmark Matrix
     print(f"\n[*] Executing Benchmark Matrix (Tier: {tier})...")
     matrix_py = scripts_dir / "run_matrix.py"
-    matrix_cmd = [sys.executable, str(matrix_py), "--tier", tier]
+    matrix_out_dir = str(Path(args.output_dir) / "matrix")
+    matrix_cmd = [sys.executable, str(matrix_py), "--tier", tier, "--output-dir", matrix_out_dir]
     res_matrix = subprocess.run(matrix_cmd, cwd=workspace_root, check=False)
     if res_matrix.returncode != 0:
         print(f"[!] Matrix runner exited with return code {res_matrix.returncode}")
@@ -153,10 +154,12 @@ def main():
     # Step 3: Generate Visual and Tabular Reports
     print("\n[*] Synthesizing publication reports and Pareto frontier SVG...")
     report_py = scripts_dir / "generate_report.py"
+    matrix_summary_json = str(Path(args.output_dir) / "matrix" / "matrix_summary.json")
     report_cmd = [
         sys.executable,
         str(report_py),
         "--output-dir", args.output_dir,
+        "--input-matrix", matrix_summary_json,
     ]
     res_report = subprocess.run(report_cmd, cwd=workspace_root, check=False)
     if res_report.returncode != 0:
