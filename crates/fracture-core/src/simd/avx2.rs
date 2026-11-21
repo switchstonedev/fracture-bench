@@ -1,4 +1,5 @@
-#[cfg(target_arch = "x86_64")]
+#![cfg(target_arch = "x86_64")]
+
 use std::arch::x86_64::*;
 
 /// Computes the dot product between two f32 slices using 256-bit AVX2 + FMA instructions.

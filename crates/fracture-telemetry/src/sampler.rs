@@ -101,8 +101,22 @@ mod tests {
 
     #[test]
     fn test_telemetry_sampler_lifecycle() {
-        let sampler =
-            TelemetrySampler::spawn(PathBuf::from("."), Duration::from_millis(5)).unwrap();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "cgroup_sampler_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let _ = std::fs::write(
+            temp_dir.join("memory.stat"),
+            b"pgmajfault 42\nworkingset_refault 10\n",
+        );
+        let _ = std::fs::write(temp_dir.join("cpu.stat"), b"throttled_usec 500\n");
+
+        let sampler = TelemetrySampler::spawn(temp_dir.clone(), Duration::from_millis(5)).unwrap();
         thread::sleep(Duration::from_millis(30));
         let (samples, summary) = sampler.stop();
 
@@ -111,5 +125,6 @@ mod tests {
             "Sampler should have captured at least one sample"
         );
         assert!(summary.total_samples > 0);
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }
