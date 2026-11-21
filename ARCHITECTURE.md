@@ -1,4 +1,4 @@
-# CruciVec: Systems Architecture, Hardware Pacing & Error Bounds
+# Fracture: Systems Architecture, Hardware Pacing & Error Bounds
 
 ## 1. Mathematical Foundation: Open-Loop Poisson Pacing
 
@@ -8,7 +8,7 @@ latency_closed = t_recv - t_sent
 ```
 where each client worker blocks until receiving a response before scheduling the subsequent query. When the target vector engine suffers an internal stop-the-world event (such as HNSW segment merging, garbage collection, or inverted index vacuuming), the closed-loop generator stalls synchronously. Consequently, zero requests are issued during the outage window, masking catastrophic queuing degradation.
 
-CruciVec eliminates Coordinated Omission by executing an independent, core-pinned timing thread driven by an open-loop Poisson arrival process.
+Fracture eliminates Coordinated Omission by executing an independent, core-pinned timing thread driven by an open-loop Poisson arrival process.
 
 ### 1.1 Inverse-CDF Inter-Arrival Sampling
 Inter-arrival intervals Delta_t follow an exponential distribution governed by arrival rate lambda (target QPS):
@@ -22,7 +22,7 @@ Delta_t = -ln(U) / lambda
 where U is drawn uniformly from (0.0, 1.0] using an inline `Xoroshiro128PlusPlus` pseudo-random number generator (1.2 ns per sample, zero heap allocation).
 
 ### 1.2 Dual-Histogram Latency Decomposition
-For every query i with planned schedule timestamp t_intended(i) and network socket issue timestamp t_sent(i), CruciVec records two orthogonal metrics:
+For every query i with planned schedule timestamp t_intended(i) and network socket issue timestamp t_sent(i), Fracture records two orthogonal metrics:
 
 1. **Network Service Time:**
    ```text
@@ -43,7 +43,7 @@ For every query i with planned schedule timestamp t_intended(i) and network sock
 Cooperative asynchronous timers (such as `tokio::time::sleep`) rely on OS timer wheels and event loop polling, introducing 50 µs to 2,000 µs of task-scheduling jitter.
 
 ### 2.1 Invariant TSC Primitives
-`crucivec-pacer` reads the CPU invariant Timestamp Counter using the `quanta::Clock` primitive. On modern x86_64 architectures (`CPUID.80000007H:EDX[8]`), the invariant TSC increments at a fixed nominal frequency regardless of core frequency scaling (P-states) or sleep states (C-states), providing sub-10 ns clock read overhead.
+`fracture-pacer` reads the CPU invariant Timestamp Counter using the `quanta::Clock` primitive. On modern x86_64 architectures (`CPUID.80000007H:EDX[8]`), the invariant TSC increments at a fixed nominal frequency regardless of core frequency scaling (P-states) or sleep states (C-states), providing sub-10 ns clock read overhead.
 
 ### 2.2 Hybrid Sleep & Spin Architecture
 To conserve host CPU energy during low arrival rates without compromising sub-microsecond precision at high QPS:
@@ -54,7 +54,7 @@ To conserve host CPU energy during low arrival rates without compromising sub-mi
 
 ## 3. Binary Write-Ahead Log (WAL) Specification
 
-CruciVec enforces deterministic point-in-time ground truth. Measuring search recall against a live, concurrently mutating database causes temporal drift.
+Fracture enforces deterministic point-in-time ground truth. Measuring search recall against a live, concurrently mutating database causes temporal drift.
 
 ### 3.1 64-Byte Cache-Line Aligned Record Header
 Every mutation and audit operation is appended to an immutable binary WAL. To ensure zero-copy deserialization via `bytemuck` without split-cache-line loads during AVX-512 execution, the header aligns to 64 bytes (`repr(C, align(64))`):
@@ -88,10 +88,10 @@ Every mutation and audit operation is appended to an immutable binary WAL. To en
 
 ## 4. Kernel Telemetry via Cgroups v2
 
-To correlate tail latency spikes with Linux memory subsystem transitions, `crucivec-telemetry` samples the target container's cgroups v2 statistics with zero memory allocation.
+To correlate tail latency spikes with Linux memory subsystem transitions, `fracture-telemetry` samples the target container's cgroups v2 statistics with zero memory allocation.
 
 ### 4.1 Persistent File Descriptor Recycling
-Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs of overhead. CruciVec opens `/sys/fs/cgroup/memory.stat`, `cpu.stat`, `memory.pressure`, and `io.stat` once at initialization, rewinding via `libc::lseek(fd, 0, SEEK_SET)` and reading into fixed stack buffers (`[u8; 4096]`). Parsing executes via an allocation-free byte scanner in under 2 µs.
+Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs of overhead. Fracture opens `/sys/fs/cgroup/memory.stat`, `cpu.stat`, `memory.pressure`, and `io.stat` once at initialization, rewinding via `libc::lseek(fd, 0, SEEK_SET)` and reading into fixed stack buffers (`[u8; 4096]`). Parsing executes via an allocation-free byte scanner in under 2 µs.
 
 ### 4.2 Tracked Metrics
 * `pgmajfault`: Major page faults requiring synchronous disk block reads.
@@ -108,7 +108,7 @@ Opening sysfs files on every poll traverses VFS inodes, adding 20 µs to 40 µs 
 
 ## 5. Stratified & Hashed Modulo Filter Selectivity
 
-To eliminate arbitrary filter predicate bias, queries are partitioned into three strictly calibrated cohorts. CruciVec applies a 64-bit SplitMix hash mixer (`hash_id_seeded(id, seed) % modulo`) before evaluating predicates to destroy sequential insertion order correlation while preserving mathematical pass probability:
+To eliminate arbitrary filter predicate bias, queries are partitioned into three strictly calibrated cohorts. Fracture applies a 64-bit SplitMix hash mixer (`hash_id_seeded(id, seed) % modulo`) before evaluating predicates to destroy sequential insertion order correlation while preserving mathematical pass probability:
 
 1. **Cohort High (60% Match Probability):**
    ```text
@@ -127,7 +127,7 @@ To eliminate arbitrary filter predicate bias, queries are partitioned into three
 
 ## 6. Contiguous Memory-Aligned Vector Arenas & Visibility Bitsets
 
-Offline ground-truth verification avoids fragmented heap allocations (`Vec<Vec<f32>>` or `Vec<(u64, Vec<f32>)>`). CruciVec maintains candidate corpora as contiguous memory arenas (`[N * D]` flat arrays) aligned to 64-byte hardware boundaries, paired with 64-bit packed visibility bitsets (`Vec<u64>`):
+Offline ground-truth verification avoids fragmented heap allocations (`Vec<Vec<f32>>` or `Vec<(u64, Vec<f32>)>`). Fracture maintains candidate corpora as contiguous memory arenas (`[N * D]` flat arrays) aligned to 64-byte hardware boundaries, paired with 64-bit packed visibility bitsets (`Vec<u64>`):
 
 * **Zero-Arithmetic Skipping:** If an active bitset word is all-zero (`mask == 0`), the verification kernel skips all 64 candidates instantly with zero floating-point operations.
 * **Unmasked SIMD Vector Tiles:** If a word is all-ones (`mask == !0u64`), unmasked SIMD dot products execute without branch checks.
@@ -137,7 +137,7 @@ Offline ground-truth verification avoids fragmented heap allocations (`Vec<Vec<f
 
 ## 7. Linearizability Auditing & Dual-Bound Interval Verification
 
-Under open-loop arrival concurrency, mutation operations and queries execute asynchronously across network boundaries. Evaluating recall against a single monotonic LSN induces client-side race artifacts. CruciVec applies dual-bound interval windowing based on physical invocation and response timestamps:
+Under open-loop arrival concurrency, mutation operations and queries execute asynchronously across network boundaries. Evaluating recall against a single monotonic LSN induces client-side race artifacts. Fracture applies dual-bound interval windowing based on physical invocation and response timestamps:
 
 ### 7.1 Mutation Set Partitioning
 For query `q` dispatched over network interval `[t_query_sent(q), t_query_recv(q)]`:
@@ -164,7 +164,7 @@ We define the tightest sound candidate bounds:
    A returned vector `v` is a valid true positive if and only if there exists a valid serial execution sequence of concurrent in-flight operations where `v` belongs to the exact top-K.
 
 ### 7.3 Write-Acknowledgment Normalization
-To prevent client consistency settings from confounding engine resilience metrics, CruciVec normalizes write visibility across targets:
+To prevent client consistency settings from confounding engine resilience metrics, Fracture normalizes write visibility across targets:
 * **Qdrant (v1.9+):** `wait=true` (synchronous write ACK ensuring segment memory visibility).
 * **Milvus (v2.4+):** Consistency level configured to `Bounded` (5-second staleness bound) and validated under `Strong`.
 * **pgvector (v0.8+):** `synchronous_commit = on` (transaction WAL persistence).
@@ -174,7 +174,7 @@ To prevent client consistency settings from confounding engine resilience metric
 
 ## 8. Adversarial Graph Churn: FIFO Sliding-Window & Cluster Purges
 
-Uniform random deletions only test leaf tombstone masking. CruciVec introduces two adversarial churn workloads:
+Uniform random deletions only test leaf tombstone masking. Fracture introduces two adversarial churn workloads:
 
 1. **FIFO Sliding-Window Deletion:**
    ```text
@@ -190,7 +190,7 @@ Uniform random deletions only test leaf tombstone masking. CruciVec introduces t
 ## 9. Error Bounds, Statistical Invariants & Calibration Receipts
 
 * **Pacer Timing Jitter Bound:** Median interval jitter <= 1.0 µs at up to 50,000 QPS on an isolated physical CPU core (`isolcpus`).
-  - *Empirical Calibration Receipt (`crucivec doctor` at 50,000 QPS):*
+  - *Empirical Calibration Receipt (`fracture doctor` at 50,000 QPS):*
     - Median (p50): **0.03 µs (30 nanoseconds)**
     - p90: **0.35 µs** (pinned bare-metal Linux)
     - p99: **0.78 µs** (pinned bare-metal Linux)
@@ -205,20 +205,20 @@ Uniform random deletions only test leaf tombstone masking. CruciVec introduces t
 
 ## 10. Threats to Validity & Known Limitations
 
-To maintain uncompromising metrological transparency and prevent over-generalizing empirical results, CruciVec explicitly documents its architectural boundaries and known limitations:
+To maintain uncompromising metrological transparency and prevent over-generalizing empirical results, Fracture explicitly documents its architectural boundaries and known limitations:
 
 1. **Single-Node Load Generation Ceilings:**
    - *TCP Socket Buffer Exhaustion:* Pacing open-loop requests above 100,000 QPS from a single physical node can saturate Linux loopback buffers (`tcp_wmem`, `tcp_rmem`) and connection tracking tables, shifting queuing latency from the database into the client kernel network stack.
    - *LLC Cache Contention:* When executing load generators and containerized databases on the same physical CPU socket without core shielding (`isolcpus`), L3 Last-Level Cache (LLC) thrashing can induce artificial database tail spikes. Dedicated bare-metal deployments must enforce core shielding.
 2. **Reliance on Linux `cgroup v2` & Kernel Subsystems:**
-   - CruciVec's high-frequency telemetry sampler relies directly on Linux unified cgroups v2 (`/sys/fs/cgroup`) to sample PSI (`memory.pressure`), page cache refaults (`workingset_refault`), and block I/O statistics (`io.stat`).
+   - Fracture's high-frequency telemetry sampler relies directly on Linux unified cgroups v2 (`/sys/fs/cgroup`) to sample PSI (`memory.pressure`), page cache refaults (`workingset_refault`), and block I/O statistics (`io.stat`).
    - On non-Linux host platforms (macOS Darwin, Windows NT), telemetry falls back to process-level resident set size (RSS) and wall-clock CPU sampling, omitting kernel memory pressure microsecond stalls and major page fault signals.
 3. **Lack of Hybrid Sparse-Dense Workloads:**
-   - CruciVec currently evaluates dense floating-point vector representations (e.g. 64-1536 dimensions) paired with stratified scalar metadata filter cohorts (High, Medium, Needle).
+   - Fracture currently evaluates dense floating-point vector representations (e.g. 64-1536 dimensions) paired with stratified scalar metadata filter cohorts (High, Medium, Needle).
    - Hybrid lexical-semantic workloads (such as BM25 inverted lists combined with learned sparse representations like SPLADE or dense HNSW graphs) and multi-stage re-ranking pipelines are not yet evaluated in default workload generators.
 4. **Single-Node Consistency vs. Distributed Consensus Lag:**
-   - CruciVec's dual-bound linearizability model (`S_committed` vs `S_inflight`) classifies mutation boundaries based on client-observed ACK timestamps.
-   - In distributed clustered engines (e.g. multi-node Milvus with remote QueryNodes and etcd coordinators), internal Raft replication lag across shards can cause replicas to serve stale reads temporarily. While CruciVec correctly detects these as recall drops, the benchmark does not distinguish between intra-engine index lock contention and inter-node network replication delay.
+   - Fracture's dual-bound linearizability model (`S_committed` vs `S_inflight`) classifies mutation boundaries based on client-observed ACK timestamps.
+   - In distributed clustered engines (e.g. multi-node Milvus with remote QueryNodes and etcd coordinators), internal Raft replication lag across shards can cause replicas to serve stale reads temporarily. While Fracture correctly detects these as recall drops, the benchmark does not distinguish between intra-engine index lock contention and inter-node network replication delay.
 5. **Uniform Hashed Modulo Selectivity vs. Power-Law Distributions:**
    - Stratified hashed modulo filters (`hash_id_seeded(id, seed) % modulo`) provide mathematically provable, seed-invariant selectivities (60%, 10%, 0.1%).
    - In real-world enterprise databases, filter keys often exhibit Zipfian or power-law distributions with severe attribute correlation, which may interact differently with engine query planning and pre-/post-filtering heuristics.
@@ -237,7 +237,7 @@ To eliminate L3 cache and memory bus observer effects on multi-core architecture
   - WAL telemetry logging: `/mnt/wal-tmpfs` (RAM-backed tmpfs), completely isolating WAL disk writes from database memory paging.
 * **Core Shielding:**
   - **CCD 0 (Core 0):** Host OS kernel interrupts, timer softIRQs.
-  - **CCD 0 (Core 1):** `crucivec-pacer` isolated hardware timing loop.
+  - **CCD 0 (Core 1):** `fracture-pacer` isolated hardware timing loop.
   - **CCD 0 (Cores 2-3):** Async network dispatch workers.
   - **CCD 2 (Cores 16-19):** Target database container (`--cpuset-cpus="16-19"`, `--memory="4g"`), granting a physically isolated 32 MB L3 cache slice.
 

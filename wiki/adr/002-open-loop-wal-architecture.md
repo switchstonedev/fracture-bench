@@ -13,7 +13,7 @@ aliases: [adr-002, open-loop-wal]
 Standard closed-loop vector database benchmarks suffer from Coordinated Omission: during target database compaction or GC stalls, client workers block, hiding queuing latency from tail percentiles. Concurrently, evaluating recall against mutable shared state introduces temporal measurement drift and rank displacement under concurrent mutations.
 
 ## Decision
-1. **Decoupled Hardware TSC Pacing:** Implement `crucivec-pacer` on a dedicated OS thread pinned to CCD 0 / Core 1 via `isolcpus` using `quanta::Instant` to achieve sub-microsecond arrival scheduling jitter at up to 50,000 QPS.
+1. **Decoupled Hardware TSC Pacing:** Implement `fracture-pacer` on a dedicated OS thread pinned to CCD 0 / Core 1 via `isolcpus` using `quanta::Instant` to achieve sub-microsecond arrival scheduling jitter at up to 50,000 QPS.
 2. **Dual-Histogram Latency Accounting:** Measure both Service Time (t_recv - t_sent) and Total Coordinated-Omission-Corrected Response Time (t_recv - t_intended).
 3. **Cache-Line Aligned 64-Byte Binary WAL on tmpfs:** Persist all mutations to an append-only binary Write-Ahead Log with monotonic Log Sequence Numbers (LSNs) and 64-byte hardware cache-line alignment (`repr(C, align(64))`), mapped to `tmpfs` to eliminate NVMe I/O interference with target database memory paging.
 4. **Formal Dual-Bound Top-K Linearizability:** Define sound candidate bounds accounting for in-flight mutations:

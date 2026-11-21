@@ -250,16 +250,16 @@ mod tests {
             let mut scores = vec![0.0f32; num_vectors];
             arena.score_query(query, &mut scores).unwrap();
 
-            for i in 0..num_vectors {
+            for (i, &score) in scores.iter().enumerate().take(num_vectors) {
                 let id = (i as u64) + 1;
                 if deleted_ids.contains(&id) {
-                    prop_assert_eq!(scores[i], f32::NEG_INFINITY);
+                    prop_assert_eq!(score, f32::NEG_INFINITY);
                     prop_assert!(!arena.is_visible(id));
                 } else {
                     let offset = i * dim;
                     let vec_slice = &raw_floats[offset..offset + dim];
                     let scalar_dot = crate::simd::neon::dot_product_scalar(query, vec_slice);
-                    let diff = (scores[i] - scalar_dot).abs();
+                    let diff = (score - scalar_dot).abs();
                     let rel_diff = diff / scalar_dot.abs().max(1.0);
                     prop_assert!(rel_diff < 1e-4 || diff < 1e-3, "Dot product tolerance exceeded: diff={}, rel_diff={}", diff, rel_diff);
                     prop_assert!(arena.is_visible(id));

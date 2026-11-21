@@ -19,18 +19,18 @@ tags: [distillation, memory, switchstonedev_fracture_bench]
 - **Architectural Invariant 2 (Point-in-Time Query Cutoff):** Query dispatch tickets capture the current observed LSN boundary, enabling exact offline point-in-time Recall@K evaluation against reconstructed dataset snapshots.
 - **Architectural Invariant 3 (Zero-External-SDK Adapters):** Target database clients (Qdrant, Milvus, pgvector, LanceDB) implement native async HTTP/1.1 and PostgreSQL v3 protocol engines using Tokio primitives without requiring third-party SDK dependencies.
 
-### Session Distillation: awesome06_crucivec
+### Session Distillation: awesome06_fracture
 - **Modified Components:** .agent/hooks/pre-commit.ps1
 - **Encountered Trap:** 17: - **Encountered Trap:** git : error: .agent/hooks/pre-commit.sh: cannot add to the index - missing --add option?
 - **Resolution:** Invariant verified via deterministic test suite.
 
-### Session Distillation: awesome06_crucivec
-- **Modified Components:** `crucivec-adapters`, `crucivec-cli`, `crucivec-core`, `fixtures`
+### Session Distillation: awesome06_fracture
+- **Modified Components:** `fracture-adapters`, `fracture-cli`, `fracture-core`, `fixtures`
 - **Architectural Invariant 4 (Native Batch Ingestion & Corpus Seeding):** Pre-populating target vector engines via `upsert_batch` achieves over 7,400 vec/s while recording sequential WAL LSNs (1..N) to establish deterministic ground truth prior to open-loop churn benchmarking.
 - **Architectural Invariant 5 (Payload & SQL Filter Pushdown):** Stratified modulo selectivity cohorts (High 60%, Medium 10%, Needle 0.1%) map natively to indexed integer payload filters in Qdrant and SQL modulo predicates in pgvector.
 - **Encountered Trap:** Host PostgreSQL service conflict on default port 5432; resolved by remapping fixture port to 5433 with `POSTGRES_HOST_AUTH_METHOD=trust`.
 
-### Session Distillation: awesome06_crucivec
+### Session Distillation: awesome06_fracture
 - **Modified Components:** None
 - **Encountered Trap:** 125:                     anyhow::bail!("PostgreSQL authentication error: {}", err_str);
 - **Resolution:** Invariant verified via deterministic test suite.

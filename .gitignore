@@ -9,9 +9,10 @@ desktop.ini
 *.swp
 *.swo
 
-# Antigravity dynamic links (rebuilt per workspace; tracked via .agent/.active-skills.json)
-.agents/skills/*
-!.agents/skills/.gitkeep
+# Antigravity agent configuration and runtime directories
+.agent/
+.agents/
+*.active-skills.json.bak
 
 # Common language build & runtime artifacts
 node_modules/
@@ -38,10 +39,6 @@ wiki-graph.html
 wiki-graph.dot
 wiki-graph.mermaid
 
-# Antigravity dynamic cluster leases & runtime state
-.agents/.skill-leases.json
-*.active-skills.json.bak
-
 # Competition video & agent scratch artifacts
 DEMO_VIDEO_SCRIPT.md
 demo-recording/
@@ -59,9 +56,6 @@ secrets/
 *.sqlite
 *.sqlite3
 data/
-
-# Local agent rules & maintainer taste
-.agents/rules/
 
 # Local benchmark execution runs & WALs
 runs/

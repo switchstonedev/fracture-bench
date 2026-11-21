@@ -19,7 +19,7 @@ flowchart TD
         end
 
         subgraph CCD0_Core1 ["CCD 0 / Core 1 (Pacer - isolcpus)"]
-            Pacer[crucivec-pacer<br/>quanta TSC + Inverse-CDF]
+            Pacer[fracture-pacer<br/>quanta TSC + Inverse-CDF]
             WAL[Binary WAL Writer<br/>64B Aligned Header on tmpfs]
         end
 
@@ -30,12 +30,12 @@ flowchart TD
 
         subgraph CCD2_Cores1619 ["CCD 2 / Cores 16-19 (Target Container)"]
             TargetDB[(Target Vector DB<br/>Qdrant / Milvus / pgvector / LanceDB)]
-            Telemetry[crucivec-telemetry<br/>Persistent-fd /sys/fs/cgroup Scraper]
+            Telemetry[fracture-telemetry<br/>Persistent-fd /sys/fs/cgroup Scraper]
         end
     end
 
     subgraph OfflineAnalysis ["Offline Evaluation Pipeline"]
-        GroundTruth[crucivec verify<br/>Dual-Bound Top-K (G_min vs G_max)<br/>Rayon + AVX2 Linear Scan]
+        GroundTruth[fracture verify<br/>Dual-Bound Top-K (G_min vs G_max)<br/>Rayon + AVX2 Linear Scan]
         Report[generate_report.py<br/>Dual-CDFs & Pareto Frontiers]
     end
 
