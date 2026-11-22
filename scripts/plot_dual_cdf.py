@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-plot_dual_cdf.py - Publication-Grade Dual-CDF Latency Plotter.
-Renders ACM/IEEE single-column width (3.33 inches) vector PDF showing
-Service Time vs. Coordinated-Omission-Corrected Total Response Time.
+plot_dual_cdf.py - Dual-CDF Latency Plotter.
+Renders vector plot showing Service Time vs. Coordinated-Omission-Corrected Total Response Time.
 Supports loading real trace JSON artifacts with empirical queueing fallback.
 """
 
@@ -18,9 +17,9 @@ try:
 except ImportError:
     HAS_MATPLOTLIB = False
 
-COLUMN_WIDTH_INCHES = 3.33
+COLUMN_WIDTH_INCHES = 6.0
 
-def setup_academic_plot_style():
+def setup_plot_style():
     if not HAS_MATPLOTLIB:
         return
     plt.rcParams.update({
@@ -50,12 +49,10 @@ def load_trace_latencies(trace_path: Path):
 
 def generate_dual_cdf(output_path: Path, trace_path: Path = None):
     if not HAS_MATPLOTLIB:
-        if output_path.exists():
-            print(f"Notice: matplotlib not installed. Preserving pre-rendered vector PDF -> {output_path}")
-            return
-        raise RuntimeError(f"matplotlib is required to render {output_path}")
-    setup_academic_plot_style()
-    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH_INCHES, 2.4))
+        print(f"Notice: matplotlib not installed; skipping plot generation for {output_path}")
+        return
+    setup_plot_style()
+    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH_INCHES, 3.6))
 
     # Try loading real traces first
     service_times, total_times = None, None
@@ -105,13 +102,12 @@ def generate_dual_cdf(output_path: Path, trace_path: Path = None):
     ax.legend(loc="lower right", frameon=True, edgecolor="none", facecolor="white")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, format="pdf", dpi=300)
+    fmt = output_path.suffix.lstrip(".").lower() or "svg"
+    fig.savefig(output_path, format=fmt, dpi=300)
     plt.close(fig)
     print(f"Rendered vector Dual-CDF plot -> {output_path}")
 
 if __name__ == "__main__":
-    out1 = Path("Results/figures/figure_dual_cdf.pdf")
-    out2 = Path("paper/figures/figure_dual_cdf.pdf")
+    out1 = Path("results/figures/dual_cdf.svg")
     trace = Path("reports/traces/dual_cdf.json")
     generate_dual_cdf(out1, trace)
-    generate_dual_cdf(out2, trace)

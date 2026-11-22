@@ -69,7 +69,7 @@ impl CgroupStats {
 /// Operational grading of telemetry sources to guarantee benchmark audit integrity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TelemetryGrade {
-    /// Linux cgroups v2 kernel interface (gold standard for publication).
+    /// Linux cgroups v2 kernel interface (gold standard for benchmark telemetry).
     KernelCgroupV2,
     /// Fallback /proc parser.
     Procfs,

@@ -75,13 +75,4 @@ runs/
 results/traces/benchmark.json
 Results/traces/benchmark.json
 
-# LaTeX auxiliary build files
-*.aux
-*.bbl
-*.blg
-*.log
-*.out
-*.synctex.gz
-*.fdb_latexmk
-*.fls
-Paper/main.pdf
+

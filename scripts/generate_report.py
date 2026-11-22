@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-generate_report.py - Publication-grade visual artifact and trace report generator.
+generate_report.py - Visual artifact and trace report generator.
 Produces SVG/HTML Dual-CDF curves, Pareto frontiers, and cgroups v2 time-series.
 Outputs:
   - reports/figures/dual_cdf.svg
   - reports/figures/pareto_frontier.svg
   - reports/benchmark_summary.md (GFM markdown table adhering to Anti-LaTeX plain-text invariant)
-  - reports/benchmark_summary.tex (LaTeX tabular adhering to ops/academic-artifact-evaluation)
 
 Standardized placeholder policy:
 Any unexecuted or unreachable metric is formatted strictly as:
@@ -40,7 +39,7 @@ def generate_svg_dual_cdf(
     output_path: Path,
 ):
     """
-    Renders a publication-ready SVG Dual-CDF curve comparing
+    Renders an SVG Dual-CDF curve comparing
     uncorrected service time against Coordinated-Omission-corrected total response time.
     """
     svg_width = 720
@@ -114,7 +113,7 @@ def generate_svg_dual_cdf(
 
 def generate_svg_pareto_frontier(cells: List[Dict[str, Any]], output_path: Path):
     """
-    Renders a publication-ready Pareto Frontier SVG: Recall@10 (X-axis) vs. Achieved QPS (Y-axis).
+    Renders a Pareto Frontier SVG: Recall@10 (X-axis) vs. Achieved QPS (Y-axis).
     """
     svg_width = 720
     svg_height = 420
@@ -240,51 +239,6 @@ def generate_markdown_table(cells: List[Dict[str, Any]], output_path: Path):
     output_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Generated Markdown Summary -> {output_path}")
 
-def generate_latex_table(cells: List[Dict[str, Any]], output_path: Path):
-    """
-    Exports publication-grade LaTeX tabular adhering to ops/academic-artifact-evaluation.
-    Standardized placeholders {metric_originTech} are preserved for unrun evaluations.
-    """
-    headers = [
-        "Target",
-        "Workload",
-        "Target QPS",
-        "Achieved QPS",
-        r"Service p99 ($\mu$s)",
-        r"Total p99 ($\mu$s)",
-        "Recall@10",
-    ]
-
-    col_spec = "llrrrrr"
-    lines = [
-        f"\\begin{{tabular}}{{{col_spec}}}",
-        "\\toprule",
-        " & ".join(headers) + " \\\\",
-        "\\midrule",
-    ]
-
-    for c in cells:
-        target = c["target"]
-        workload = c["workload"]
-        t_qps = str(c["target_qps"])
-        a_qps = format_metric(c.get("achieved_qps"), "achievedQps", target, 1)
-        s_p99 = format_metric(c.get("service_p99_us"), "serviceP99", target, 1)
-        t_p99 = format_metric(c.get("total_p99_us"), "totalP99", target, 1)
-        r_10 = format_metric(c.get("recall_at_10"), "recall10", target, 4)
-
-        row = [target, workload, t_qps, a_qps, s_p99, t_p99, r_10]
-        lines.append(" & ".join(row) + " \\\\")
-
-    lines.extend([
-        "\\bottomrule",
-        "\\end{tabular}",
-        "",
-    ])
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Generated LaTeX Tabular -> {output_path}")
-
 def main():
     parser = argparse.ArgumentParser(description="Generate Fracture Visual and Tabular Reports")
     parser.add_argument("--input", "-i", type=str, help="Path to single benchmark JSON export")
@@ -356,7 +310,6 @@ def main():
         cells = matrix_data.get("cells", [])
         generate_svg_pareto_frontier(cells, fig_dir / "pareto_frontier.svg")
         generate_markdown_table(cells, out_dir / "benchmark_summary.md")
-        generate_latex_table(cells, out_dir / "benchmark_summary.tex")
     else:
         print(f"Notice: Matrix summary {matrix_file} not found; skipping Pareto and tabular exports.")
 

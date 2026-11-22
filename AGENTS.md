@@ -1,21 +1,19 @@
 ---
-mode: research
-harness: personal-sidecar
+mode: author-oss
+harness: author-sidecar
 ---
 
-# Workspace Agent Directives (Research Paper Governance)
+# Workspace Agent Directives (Benchmark Governance)
 
-## 1. Academic Research & Artifact Governance Invariants
+## 1. Benchmark Execution & Metric Governance Invariants
 
-- **Single-Blind & Camera-Ready Publication Policy:** This repository targets the 53rd International Conference on Very Large Data Bases (VLDB 2027) / Proceedings of the VLDB Endowment (PVLDB Volume 20) under the Experiment, Analysis & Benchmark (EA&B) track. In accordance with `research/academic-publishing`, PVLDB EA&B operates with unblinded author attribution and canonical open-source artifact citation.
-- **Three-Tier Benchmark Reproduction Hierarchy:** In compliance with `research/academic-artifact-evaluation`:
-  - **Level 1 — Dry Run (`--dry-run` / `--tier dry_run`):** 10–30s sanity check verifying audited checksums (`sha256sums.txt`), mock execution, and rendering of all SVGs/tables without compute strain.
-  - **Level 2 — Sample / Pilot (`--sample` / `--tier sample`):** 2–5m pilot sweep at 1,000 QPS across mutation churn workloads, proving functional reproducibility within reviewer time budgets.
-  - **Level 3 — Full Benchmark (`--full` / `--tier full`):** Exhaustive multi-engine empirical evaluation replicating the complete paper experimental matrix.
-- **Standardized Metric Placeholder Policy:** Uncomputed, pending, or unreachable metrics in tables or draft manuscripts MUST format strictly as `{metric_originTech}` (e.g. `{achievedQps_milvus}`, `{recall10_pgvector}`). Arbitrary ad-hoc strings (`TODO`, `??`, `N/A`) or fabricated numeric estimations are STRICTLY FORBIDDEN.
+- **Three-Tier Benchmark Reproduction Hierarchy:**
+  - **Level 1 — Dry Run (`--dry-run` / `--tier dry_run`):** 10–30s sanity check verifying CLI flags, mock execution, and rendering of all SVGs/tables without compute strain.
+  - **Level 2 — Sample / Pilot (`--sample` / `--tier sample`):** 2–5m pilot sweep at 1,000 QPS across mutation churn workloads, proving functional reproducibility within quick time budgets.
+  - **Level 3 — Full Benchmark (`--full` / `--tier full`):** Exhaustive multi-engine empirical evaluation replicating the complete experimental matrix.
+- **Standardized Metric Placeholder Policy:** Uncomputed, pending, or unreachable metrics in tables or reports MUST format strictly as `{metric_originTech}` (e.g. `{achievedQps_milvus}`, `{recall10_pgvector}`). Arbitrary ad-hoc strings (`TODO`, `??`, `N/A`) or fabricated numeric estimations are STRICTLY FORBIDDEN.
 - **Strict Repository-Relative Path Invariant:** All scripts, tests, data loaders, documentation, configuration files, and commit histories MUST employ strictly repository-relative paths (`Path(__file__).resolve().parent`, `./...`). Hardcoding absolute host paths (such as `C:\Users\...` or host drive letters) is STRICTLY FORBIDDEN.
-- **Statistical Rigor:** All empirical comparisons MUST employ non-parametric effect sizes (Vargha-Delaney A12, Cliff's delta) and Wilson score confidence intervals rather than raw uncalibrated means (`data/empirical-se-statistics`).
-- **Downstream Artifact Synchronization:** `FractureArtifact` is the downstream immutable replication package derived from this research repository. Any structural updates to benchmarks, fixtures, or container definitions MUST be synchronized to `FractureArtifact`, keeping `FractureArtifact` completely free of agent sidecars (`.agent/`, `.agents/skills/`).
+- **Statistical Rigor:** All empirical comparisons MUST employ non-parametric effect sizes (Vargha-Delaney A12, Cliff's delta) and Wilson score confidence intervals rather than raw uncalibrated means.
 
 ---
 
@@ -46,7 +44,7 @@ harness: personal-sidecar
      - *Mode B (Feature Creation & Greenfield):* Creating new files and scaffolding interfaces follows contract-and-specification-first flow; agents are not blocked by defect reproducer tripwires.
   3. **Adversarial Pre-Flight Filter:** Audit diffs for zero formatting noise (<= 5% pure whitespace churn), ensure concurrency sanitizers (`-race`) pass, and eliminate extraneous debug statements.
   4. **Recursive Distiller:** Capture trajectory deltas and record generalizable architectural invariants.
-- **Repository Mode Boundary:** External OSS maintainer restrictions, upstream PR taste mimicry, diff noise ceilings, and mandatory red-test reproducer gates are strictly confined to external open-source repositories (`mode == "oss"`). Personal repositories (`mode == "personal"`, identified via `detect_mode.py`, username namespaces like `awesome06`, or explicit `.agents/mode`) are completely exempt from upstream OSS gatekeeping; the user's personal development harness, rapid prototyping, and custom engineering flows govern without interference.
+- **Repository Mode Boundary:** External OSS maintainer restrictions, upstream PR taste mimicry, diff noise ceilings, and mandatory red-test reproducer gates are strictly confined to external open-source repositories (`mode == "oss"`). Author-maintained open-source repositories (`mode == "author-oss"`, identified via `detect_mode.py`, username namespaces like `awesome06`, or explicit `.agents/mode`) and personal repositories are completely exempt from upstream OSS gatekeeping; the maintainer's architectural authority, rapid prototyping, and custom engineering flows govern without interference.
 - **Mental Anti-Slop Scrubber Invariant:** All pull request titles, summaries, commit messages, and review comments across all repositories MUST pass the Repo-Agnostic Mental Anti-Slop Scrubber. Corporate jargon (`holistic`, `comprehensive`, `robust`, `seamless`, `surgical`), self-congratulatory boilerplate (`adheres to enterprise standards`), AI hallmarks (`delve`, `tapestry`), and raw terminal log dumps are strictly prohibited.
 - **Compile-Signal Upstream Parity Invariant:** During upstream dependency upgrades, compiler errors (unhandled enum variants, new trait methods, restructured fields) MUST be treated as hard diagnostic signals of expanded upstream surface. Suppressing warnings or stubbing dummy returns is strictly forbidden; agents must audit and expose matching capabilities in client-facing APIs.
 - **CI Reality & Execution Parity Transparency:** Authoring tests for runtimes or subsystems that compile locally but are omitted from active continuous integration workflows (`.github/workflows/*.yml`) is STRICTLY FORBIDDEN. Agents must verify CI workflow commands before writing tests; unexecuted tests in CI are dead weight that rot silently.

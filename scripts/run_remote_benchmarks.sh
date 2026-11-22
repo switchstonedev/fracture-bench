@@ -137,50 +137,21 @@ python3 "${WORKSPACE_ROOT}/Scripts/measure_drift.py" \
     --output-dir "${OUTPUT_DIR}"
 
 # ------------------------------------------------------------------------------
-# Step 6: Publication Artifact Synthesis & Visual Formatting
+# Step 6: Benchmark Report Synthesis & Visual Formatting
 # ------------------------------------------------------------------------------
-echo -e "\n[*] Step 6: Generating Markdown, LaTeX tables, and Pareto SVGs..."
+echo -e "\n[*] Step 6: Generating Markdown summary tables and Pareto SVGs..."
 python3 "${WORKSPACE_ROOT}/Scripts/generate_report.py" \
     --output-dir "${OUTPUT_DIR}" \
     --input-matrix "${MATRIX_DIR}/matrix_summary.json"
 
-# Re-render vector PDFs for paper if matplotlib is available
+# Re-render vector plots if matplotlib is available
 if python3 -c "import matplotlib" &>/dev/null; then
-    echo -e "\n[*] Rendering publication vector PDFs..."
+    echo -e "\n[*] Rendering vector figures..."
     python3 "${WORKSPACE_ROOT}/Scripts/plot_dual_cdf.py" || true
     python3 "${WORKSPACE_ROOT}/Scripts/plot_cgroups_timeseries.py" || true
     python3 "${WORKSPACE_ROOT}/Scripts/plot_pareto.py" || true
     python3 "${WORKSPACE_ROOT}/Scripts/plot_recall_drift.py" || true
     python3 "${WORKSPACE_ROOT}/Scripts/plot_filtering_pathology.py" || true
-fi
-
-# ------------------------------------------------------------------------------
-# Step 7: LaTeX Document Recompilation
-# ------------------------------------------------------------------------------
-if command -v pdflatex &>/dev/null; then
-    echo -e "\n[*] Recompiling paper manuscript (main.tex)..."
-    PAPER_DIR="${WORKSPACE_ROOT}/Paper"
-    if [ ! -d "${PAPER_DIR}" ]; then
-        PAPER_DIR="${WORKSPACE_ROOT}/paper"
-    fi
-    if [ -d "${PAPER_DIR}" ]; then
-        cd "${PAPER_DIR}"
-        pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
-        bibtex main >/dev/null 2>&1 || true
-        pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
-        pdflatex -interaction=nonstopmode main.tex >/dev/null 2>&1 || true
-        cd "${WORKSPACE_ROOT}"
-        echo "  [+] PDF generated: ${PAPER_DIR}/main.pdf"
-    fi
-fi
-
-# ------------------------------------------------------------------------------
-# Step 8: Update Audited SHA-256 Digest Manifest
-# ------------------------------------------------------------------------------
-echo -e "\n[*] Step 8: Refreshing sha256sums.txt checksum manifest..."
-if command -v sha256sum &>/dev/null; then
-    find reports -type f -exec sha256sum {} + > "${WORKSPACE_ROOT}/sha256sums.txt" || true
-    echo "  [+] sha256sums.txt updated."
 fi
 
 echo -e "\n========================================================================"

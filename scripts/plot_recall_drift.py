@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-plot_recall_drift.py - Generates publication-grade Recall@10 degradation curves
+plot_recall_drift.py - Generates Recall@10 degradation curves
 as a function of the tombstone saturation ratio tau = Deleted / Active.
-Follows ACM/IEEE publication standards: exactly 3.33 in width, serif fonts, colorblind-safe.
+Colorblind-safe palette.
 """
 
 from pathlib import Path
@@ -17,9 +17,9 @@ try:
 except ImportError:
     HAS_MATPLOTLIB = False
 
-COLUMN_WIDTH = 3.33
+COLUMN_WIDTH = 6.0
 
-def setup_academic_plot_style():
+def setup_plot_style():
     if not HAS_MATPLOTLIB:
         return
     plt.rcParams.update({
@@ -37,12 +37,10 @@ def setup_academic_plot_style():
 
 def generate_recall_drift_plot(output_path: Path, drift_json: Path = None):
     if not HAS_MATPLOTLIB:
-        if output_path.exists():
-            print(f"Notice: matplotlib not installed. Preserving pre-rendered vector PDF -> {output_path}")
-            return
-        raise RuntimeError(f"matplotlib is required to render {output_path}")
-    setup_academic_plot_style()
-    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH, 2.4))
+        print(f"Notice: matplotlib not installed; skipping plot generation for {output_path}")
+        return
+    setup_plot_style()
+    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH, 3.6))
 
     # Tombstone saturation ratio tau = Deleted / Active
     tau = np.array([0.0, 0.10, 0.20, 0.30, 0.40, 0.50])
@@ -71,12 +69,11 @@ def generate_recall_drift_plot(output_path: Path, drift_json: Path = None):
     ax.legend(loc="lower left", frameon=True, edgecolor="none", facecolor="white")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, format="pdf", dpi=300)
+    fmt = output_path.suffix.lstrip(".").lower() or "svg"
+    fig.savefig(output_path, format=fmt, dpi=300)
     plt.close(fig)
     print(f"Rendered vector Recall Drift plot -> {output_path}")
 
 if __name__ == "__main__":
-    out1 = Path("Results/figures/figure_recall_drift.pdf")
-    out2 = Path("paper/figures/figure_recall_drift.pdf")
+    out1 = Path("results/figures/recall_drift.svg")
     generate_recall_drift_plot(out1)
-    generate_recall_drift_plot(out2)

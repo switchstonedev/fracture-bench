@@ -49,7 +49,6 @@ def main():
     parser.add_argument("--tier", type=str, default="sample", choices=["dry_run", "sample", "full"])
     parser.add_argument("--output-dir", type=str, default="reports")
     parser.add_argument("--skip-docker", action="store_true", help="Skip starting Docker containers")
-    parser.add_argument("--recompile-pdf", action="store_true", help="Recompile LaTeX paper after run")
     args = parser.parse_args()
 
     workspace_root = Path(__file__).resolve().parent.parent
@@ -101,7 +100,7 @@ def main():
     ], cwd=workspace_root, check=False)
 
     # Step 5: Generate reports
-    print("\n[*] Step 5: Synthesizing publication report artifacts...")
+    print("\n[*] Step 5: Synthesizing benchmark report artifacts...")
     report_script = scripts_dir / "generate_report.py"
     matrix_summary_json = matrix_dir / "matrix_summary.json"
     subprocess.run([
@@ -113,24 +112,13 @@ def main():
     # Step 6: Render plots if matplotlib is available
     try:
         import matplotlib
-        print("\n[*] Step 6: Re-rendering publication vector PDF figures...")
+        print("\n[*] Step 6: Re-rendering vector figures...")
         for plot_name in ["plot_dual_cdf.py", "plot_cgroups_timeseries.py", "plot_pareto.py", "plot_recall_drift.py", "plot_filtering_pathology.py"]:
             plot_script = scripts_dir / plot_name
             if plot_script.is_file():
                 subprocess.run([sys.executable, str(plot_script)], cwd=workspace_root, check=False)
     except ImportError:
-        print("\n[*] Step 6: Skipping matplotlib vector PDF re-rendering (matplotlib not installed).")
-
-    # Step 7: Optional PDF recompilation
-    if args.recompile_pdf and shutil.which("pdflatex"):
-        print("\n[*] Step 7: Recompiling paper manuscript...")
-        paper_dir = workspace_root / "Paper" if (workspace_root / "Paper").is_dir() else workspace_root / "paper"
-        if paper_dir.is_dir():
-            subprocess.run(["pdflatex", "-interaction=nonstopmode", "main.tex"], cwd=paper_dir, check=False)
-            subprocess.run(["bibtex", "main"], cwd=paper_dir, check=False)
-            subprocess.run(["pdflatex", "-interaction=nonstopmode", "main.tex"], cwd=paper_dir, check=False)
-            subprocess.run(["pdflatex", "-interaction=nonstopmode", "main.tex"], cwd=paper_dir, check=False)
-            print(f"  [+] Output: {paper_dir / 'main.pdf'}")
+        print("\n[*] Step 6: Skipping matplotlib vector re-rendering (matplotlib not installed).")
 
     print("\n[SUCCESS] Benchmark preparation and pipeline verification completed.")
 

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-Root entrypoint delegator for Fracture research paper reproduction.
-Directs execution to Scripts/reproduce.py.
+Root entrypoint delegator for Fracture benchmark reproduction.
+Directs execution to scripts/reproduce.py.
 """
 import sys
 from pathlib import Path
 
-scripts_reproduce = Path(__file__).resolve().parent / "Scripts" / "reproduce.py"
+root = Path(__file__).resolve().parent
+scripts_reproduce = root / "scripts" / "reproduce.py"
+if not scripts_reproduce.is_file():
+    scripts_reproduce = root / "Scripts" / "reproduce.py"
 if not scripts_reproduce.is_file():
     raise FileNotFoundError(f"Underlying runner not found: {scripts_reproduce}")
 

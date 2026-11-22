@@ -111,9 +111,9 @@ Fracture serves as an adversarial, vendor-neutral referee for vector databases. 
 
 ---
 
-## 3. Maintainer Pre-Publication Configuration Review Protocol
+## 3. Maintainer Pre-Release Configuration Review Protocol
 
-To avoid publishing benchmarks with suboptimal flags, mismatched connection pools, or unfair memory ceilings, Fracture mandates an open pre-publication configuration review with engine maintainers.
+To avoid publishing benchmarks with suboptimal flags, mismatched connection pools, or unfair memory ceilings, Fracture mandates an open pre-release configuration review with engine maintainers.
 
 ### Review Principles
 1. **Deterministic Index Creation:** Any recommended index tuning must be applied via adapter initialization code (`VectorEngineAdapter::init`) or the Docker compose fixture in `fixtures/`.
@@ -122,7 +122,7 @@ To avoid publishing benchmarks with suboptimal flags, mismatched connection pool
 4. **Transparent Audit Trail:** All maintainer suggestions, discussions, and tuning updates are committed directly into `VENDORS.md` with links to public GitHub Discussions or pull requests.
 
 ### Standard Maintainer Outreach Template
-Before publishing flagship comparison charts or submitting camera-ready academic papers, Fracture reaches out to each target engine's maintainers (via Discord, GitHub Discussions, or issue trackers) using this standardized template:
+Before publishing flagship comparison charts or official benchmark reports, Fracture reaches out to each target engine's maintainers (via Discord, GitHub Discussions, or issue trackers) using this standardized template:
 
 ```text
 Subject: Fracture Benchmark Configuration Review & Fair Tuning Audit — [Engine Name]
@@ -131,7 +131,7 @@ Dear [Engine Name] Maintainers and Core Team,
 
 I am conducting an empirical systems study on vector database performance under continuous write churn and memory pressure using Fracture (https://github.com/switchstonedev/fracture-bench).
 
-Before publishing our flagship Pareto frontiers and submitting our empirical findings to peer-reviewed systems venues (VLDB EAB / SIGMOD DBTest), we want to ensure [Engine Name] is configured completely fairly and reflects your recommended production best practices.
+Before publishing our flagship Pareto frontiers and empirical benchmarks, we want to ensure [Engine Name] is configured completely fairly and reflects your recommended production best practices.
 
 Our currently audited configuration for [Engine Name] is:
 - Docker Image: [e.g. qdrant/qdrant:v1.8.0 / pgvector:pg16]
@@ -148,7 +148,7 @@ Specific Questions for Your Team:
 You can review our complete adapter implementation in:
 https://github.com/switchstonedev/fracture-bench/tree/main/crates/fracture-adapters/src/[engine].rs
 
-We welcome your feedback and pull requests. If you would like us to re-run our automated reproduction pipeline with your suggested settings, we will gladly incorporate them and credit your team in the paper and repository.
+We welcome your feedback and pull requests. If you would like us to re-run our automated reproduction pipeline with your suggested settings, we will gladly incorporate them and credit your team in the benchmark reports and repository.
 ```
 
 ---
@@ -164,5 +164,5 @@ When Fracture uncovers an unexpected performance cliff, severe memory leak, or c
    - **Isolated Docker Reproduction Script:** A single shell script spinning up the exact container version and running the reproduction in < 60 seconds.
    - **Kernel Subsystem Telemetry Logs:** High-frequency Linux PSI memory stall data, workingset refault counters, and I/O Write Amplification Factor logs.
 3. **Collaborative Verification & Postscript Remediation:**
-   Maintainers are invited to analyze the trace and supply an experimental branch, patch, or updated Docker tag. Fracture re-runs the benchmark against the patched engine, documenting both the original anomaly and the verified vendor remediation in the final publication.
+   Maintainers are invited to analyze the trace and supply an experimental branch, patch, or updated Docker tag. Fracture re-runs the benchmark against the patched engine, documenting both the original anomaly and the verified vendor remediation in the final benchmark reports.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 run_matrix.py - Automated multi-engine benchmark matrix runner for Fracture.
-Adheres to ops/academic-artifact-evaluation three-tier hierarchy:
+Three-tier execution hierarchy:
   - Level 1: dry_run (< 30s, zero load, connectivity and directory validation)
   - Level 2: sample (1-3 min, low QPS / small corpus pilot test)
   - Level 3: full (complete QPS sweep across target engines)

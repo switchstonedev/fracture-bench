@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ACM / IEEE Artifact Evaluation Single-Entrypoint Reproduction Script (POSIX)
-# Fracture Artifact Evaluation
+# Fracture Benchmark Reproduction Script (POSIX)
 # ==============================================================================
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

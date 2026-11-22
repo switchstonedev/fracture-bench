@@ -1,4 +1,4 @@
-# Hermetic reproduction container for Fracture Artifact Evaluation
+# Hermetic reproduction container for Fracture Benchmark
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive

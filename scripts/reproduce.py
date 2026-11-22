@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 reproduce.py - Deterministic single-entrypoint reproduction harness for Fracture.
-Adheres strictly to ops/academic-artifact-evaluation for ACM/IEEE reproducibility badging.
 
 Execution Hierarchy:
   - Level 1: Dry Run (--tier dry_run / --dry-run): 10-30s sanity check (zero host strain)
@@ -23,56 +22,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, NamedTuple, Optional, Tuple
-
-class VerificationReport(NamedTuple):
-    is_valid: bool
-    missing_files: List[str]
-    mismatches: List[str]
-
-def verify_sha256_manifest(workspace_root: Path, manifest_file: Path) -> VerificationReport:
-    if not manifest_file.is_file():
-        return VerificationReport(is_valid=True, missing_files=[], mismatches=[])
-
-    missing: List[str] = []
-    mismatches: List[str] = []
-    lines = manifest_file.read_text(encoding="utf-8").splitlines()
-
-    for line in lines:
-        trimmed = line.strip()
-        if not trimmed or trimmed.startswith("#"):
-            continue
-        parts = trimmed.split(maxsplit=1)
-        if len(parts) != 2:
-            continue
-
-        expected_hash, rel_path_str = parts[0], parts[1].strip()
-        target_path = workspace_root / rel_path_str
-        if not target_path.is_file():
-            # Check casing fallback (e.g. scripts/ vs Scripts/)
-            if rel_path_str.startswith("scripts/"):
-                alt = workspace_root / ("Scripts" + rel_path_str[len("scripts"):])
-                if alt.is_file():
-                    target_path = alt
-            elif rel_path_str.startswith("Scripts/"):
-                alt = workspace_root / ("scripts" + rel_path_str[len("Scripts"):])
-                if alt.is_file():
-                    target_path = alt
-
-        if not target_path.is_file():
-            missing.append(rel_path_str)
-            continue
-
-        hasher = hashlib.sha256()
-        with open(target_path, "rb") as f:
-            while chunk := f.read(65536):
-                hasher.update(chunk)
-
-        if hasher.hexdigest().lower() != expected_hash.lower():
-            mismatches.append(rel_path_str)
-
-    is_valid = (len(missing) == 0 and len(mismatches) == 0)
-    return VerificationReport(is_valid=is_valid, missing_files=missing, mismatches=mismatches)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -104,7 +53,7 @@ def main():
         "--output-dir",
         type=str,
         default="reports",
-        help="Output directory for generated publication artifacts",
+        help="Output directory for generated benchmark artifacts",
     )
     parser.add_argument(
         "--skip-manifest-check",
@@ -131,29 +80,16 @@ def main():
 
     workspace_root = Path(__file__).resolve().parent.parent
     scripts_dir = workspace_root / "scripts"
-    manifest_file = workspace_root / "sha256sums.txt"
 
     print("=================================================================")
-    print("  Fracture: Deterministic Academic Artifact Reproduction Harness ")
+    print("     Fracture: Deterministic Benchmark Reproduction Harness      ")
     print("=================================================================")
     print(f"Target Tier     : {tier.upper()}")
     print(f"Workspace Root  : {workspace_root}")
-    print(f"Publication Dir : {workspace_root / args.output_dir}")
+    print(f"Report Dir      : {workspace_root / args.output_dir}")
     print("=================================================================")
 
-    # Step 1: Audited Checksum Manifest Gate
-    if not args.skip_manifest_check and manifest_file.is_file():
-        print(f"[*] Verifying audited SHA-256 digest manifest ({manifest_file.name})...")
-        v_rep = verify_sha256_manifest(workspace_root, manifest_file)
-        if not v_rep.is_valid:
-            if v_rep.missing_files:
-                print(f"[!] Warning: Missing manifest files: {', '.join(v_rep.missing_files)}")
-            if v_rep.mismatches:
-                print(f"[!] Warning: Digest mismatches in: {', '.join(v_rep.mismatches)}")
-        else:
-            print("[+] SHA-256 digest manifest verified successfully.")
-
-    # Step 2: Run Benchmark Matrix
+    # Step 1: Run Benchmark Matrix
     print(f"\n[*] Executing Benchmark Matrix (Tier: {tier})...")
     matrix_py = scripts_dir / "run_matrix.py"
     matrix_out_dir = str(Path(args.output_dir) / "matrix")
@@ -163,7 +99,7 @@ def main():
         print(f"[!] Matrix runner exited with return code {res_matrix.returncode}")
 
     # Step 3: Generate Visual and Tabular Reports
-    print("\n[*] Synthesizing publication reports and Pareto frontier SVG...")
+    print("\n[*] Synthesizing benchmark reports and Pareto frontier SVG...")
     report_py = scripts_dir / "generate_report.py"
     matrix_summary_json = str(Path(args.output_dir) / "matrix" / "matrix_summary.json")
     report_cmd = [
@@ -212,7 +148,7 @@ def main():
         print(f"[SUCCESS] Artifact reproduction tier '{tier}' completed cleanly.")
         print(f"All tables and figures rendered without resource exhaustion.")
     else:
-        print(f"[WARNING] Some expected publication artifacts were not created.")
+        print(f"[WARNING] Some expected benchmark artifacts were not created.")
         sys.exit(1)
 
 if __name__ == "__main__":

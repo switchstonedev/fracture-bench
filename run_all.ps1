@@ -1,6 +1,5 @@
 # ==============================================================================
-# ACM / IEEE Artifact Evaluation Single-Entrypoint Reproduction Script (PowerShell)
-# Fracture Artifact Evaluation
+# Fracture Benchmark Reproduction Script (PowerShell)
 # ==============================================================================
 param (
     [string]$Tier = "full"

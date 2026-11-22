@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-plot_filtering_pathology.py - Generates publication-grade vector figure for RQ3.
+plot_filtering_pathology.py - Generates vector figure for metadata filtering selectivity pathology.
 Evaluates query throughput (QPS) and graph traversal stalls across three metadata
 selectivity cohorts under continuous mutation churn (60%, 10%, 0.1% needle-in-haystack).
-Follows ACM/IEEE publication standards: exactly 3.33 in width, serif fonts, colorblind-safe.
+Colorblind-safe palette.
 """
 
 from pathlib import Path
@@ -17,10 +17,9 @@ try:
 except ImportError:
     HAS_MATPLOTLIB = False
 
-# ACM single-column width
-COLUMN_WIDTH = 3.33
+COLUMN_WIDTH = 6.0
 
-def setup_academic_plot_style():
+def setup_plot_style():
     if not HAS_MATPLOTLIB:
         return
     plt.rcParams.update({
@@ -38,12 +37,10 @@ def setup_academic_plot_style():
 
 def generate_filtering_plot(output_path: Path):
     if not HAS_MATPLOTLIB:
-        if output_path.exists():
-            print(f"Notice: matplotlib not installed. Preserving pre-rendered vector PDF -> {output_path}")
-            return
-        raise RuntimeError(f"matplotlib is required to render {output_path}")
-    setup_academic_plot_style()
-    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH, 2.4))
+        print(f"Notice: matplotlib not installed; skipping plot generation for {output_path}")
+        return
+    setup_plot_style()
+    fig, ax = plt.subplots(figsize=(COLUMN_WIDTH, 3.6))
 
     # Engines and Selectivity Cohorts
     engines = ["Qdrant", "Milvus", "pgvector", "LanceDB"]
@@ -78,13 +75,12 @@ def generate_filtering_plot(output_path: Path):
     ax.legend(frameon=True, edgecolor="none", facecolor="white", loc="upper right")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, format="pdf", dpi=300)
+    fmt = output_path.suffix.lstrip(".").lower() or "svg"
+    fig.savefig(output_path, format=fmt, dpi=300)
     plt.close(fig)
     print(f"Generated: {output_path}")
 
 if __name__ == "__main__":
-    out1 = Path("Results/figures/figure_filtering_pathology.pdf")
-    out2 = Path("paper/figures/figure_filtering_pathology.pdf")
+    out1 = Path("results/figures/filtering_pathology.svg")
     generate_filtering_plot(out1)
-    generate_filtering_plot(out2)
 

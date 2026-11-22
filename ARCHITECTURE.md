@@ -225,7 +225,7 @@ To maintain uncompromising metrological transparency and prevent over-generalizi
 
 ---
 
-## 11. Academic Bare-Metal Testbed Protocol (Cross-CCD Isolation)
+## 11. Bare-Metal Testbed Protocol (Cross-CCD Isolation)
 
 To eliminate L3 cache and memory bus observer effects on multi-core architectures (e.g. AMD EPYC 7763 Zen 3):
 

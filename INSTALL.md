@@ -1,6 +1,6 @@
 # Fracture Reproduction & Installation Guide
 
-This guide provides step-by-step instructions to install, verify, and reproduce the empirical results for *"Fracture: Measuring Vector Database Resilience Under Continuous Mutation [Experiment, Analysis & Benchmark]"* in compliance with ACM Artifact Review and Badging Version 1.1 (*Artifacts Available*, *Artifacts Evaluated - Functional*, *Results Reproduced*).
+This guide provides step-by-step instructions to install, verify, and reproduce the empirical benchmarks for Fracture: Measuring Vector Database Resilience Under Continuous Mutation.
 
 ---
 
@@ -19,19 +19,19 @@ This guide provides step-by-step instructions to install, verify, and reproduce 
 ### Software Dependencies
 * **Rust Toolchain:** 1.75+ (`rustup default stable`)
 * **Python Runtime:** 3.10+ with standard packages (`numpy`, `pandas`, `matplotlib`)
-* **Container Runtimes (Optional):** Docker Engine 24.0+ / Docker Compose v2, or Apptainer / Singularity 3.8+ for rootless HPC environments.
+* **Container Runtimes (Optional):** Docker Engine 24.0+ / Docker Compose v2.
 
 ---
 
 ## 2. Multi-Tier Benchmark Execution Hierarchy
 
-To accommodate reviewer time constraints, Fracture exposes a deterministic three-tier reproduction harness:
+To accommodate varying hardware and time budgets, Fracture exposes a deterministic three-tier reproduction harness:
 
 | Tier | Flag | Target Duration | Description |
 | :--- | :--- | :--- | :--- |
-| **Level 1 — Dry Run** | `--dry-run` / `--tier dry_run` | 10–30 seconds | Fast sanity check. Verifies audited checksum manifest (`sha256sums.txt`), executes mock workload sweeps, generates sample reports, and renders SVG curves. |
+| **Level 1 — Dry Run** | `--dry-run` / `--tier dry_run` | 10–30 seconds | Fast sanity check. Verifies CLI flags, executes mock workload sweeps, generates sample reports, and renders SVG curves. |
 | **Level 2 — Sample / Pilot** | `--sample` / `--tier sample` | 2–5 minutes | Evaluates accessible local engines and mock harness under 1,000 QPS across all 3 workloads (churn-70-20-10, read-heavy-90-10, write-heavy-50-50). |
-| **Level 3 — Full Benchmark** | `--full` / `--tier full` | 3–4 hours | Full experimental matrix replicating all paper claims, multi-engine comparisons (Qdrant, pgvector, Milvus, LanceDB), and Pareto frontier sweeps. |
+| **Level 3 — Full Benchmark** | `--full` / `--tier full` | 3–4 hours | Full experimental matrix replicating all benchmark targets, multi-engine comparisons (Qdrant, pgvector, Milvus, LanceDB), and Pareto frontier sweeps. |
 
 ---
 
@@ -50,15 +50,14 @@ python scripts/reproduce.py --tier dry_run
 make bench-dry
 ```
 This performs:
-1. Audited SHA-256 digest verification (`sha256sums.txt`).
-2. Rust binary compilation check.
-3. Dry-run execution of workload matrix.
-4. Rendering of publication SVGs (`reports/figures/dual_cdf.svg`, `reports/figures/pareto_frontier.svg`, `reports/figures/recall_drift.svg`).
-5. Generation of summary tables (`reports/benchmark_summary.md`, `reports/benchmark_summary.tex`).
+1. Rust binary compilation check.
+2. Dry-run execution of workload matrix.
+3. Rendering of benchmark SVGs (`reports/figures/dual_cdf.svg`, `reports/figures/pareto_frontier.svg`, `reports/figures/recall_drift.svg`).
+4. Generation of summary tables (`reports/benchmark_summary.md`, `reports/benchmark_summary.tex`).
 
 ### Step 3: Level 2 Sample Pilot Run (2–5 minutes)
 ```bash
-python Scripts/reproduce.py --tier sample
+python scripts/reproduce.py --tier sample
 # or via Makefile:
 make bench-sample
 ```
@@ -69,7 +68,7 @@ make bench-sample
 make docker-up
 
 # Execute complete matrix sweep
-python Scripts/reproduce.py --tier full
+python scripts/reproduce.py --tier full
 # or via Makefile:
 make bench-full
 ```
@@ -81,19 +80,10 @@ make bench-full
 ### Rootless Docker
 ```bash
 # Build hermetic reproduction container
-docker build -t fracture-paper .
+docker build -t fracture-bench .
 
 # Execute Level 1 dry-run inside isolated container
-docker run --rm -v $(pwd)/reports:/workspace/reports fracture-paper python3 Scripts/reproduce.py --tier dry_run
-```
-
-### Apptainer / Singularity (HPC & Multi-User Clusters)
-```bash
-# Build Singularity Image Format (SIF)
-apptainer build fracture-paper.sif Apptainer.def
-
-# Execute dry-run without root privileges
-apptainer run fracture-paper.sif --tier dry_run
+docker run --rm -v $(pwd)/reports:/workspace/reports fracture-bench python3 scripts/reproduce.py --tier dry_run
 ```
 
 ---
@@ -102,7 +92,6 @@ apptainer run fracture-paper.sif --tier dry_run
 
 | Condition | Failure State | Automated Fallback Behavior |
 | :--- | :--- | :--- |
-| **Checksum Mismatch** | Corrupted or modified fixture | Aborts execution immediately, reporting the corrupted file path. |
 | **Offline Engine** | Docker or database container unstarted | Detects connection failure and preserves `{metric_originTech}` placeholders without crashing matrix. |
 | **Host Without cgroups v2** | Windows, macOS, or legacy Linux | Fallback to user-space thread timing with explicit notice. |
-| **Reviewer Time Limit** | Limited evaluation window | Run Level 1 (`--dry-run`) or Level 2 (`--sample`) for complete validation within minutes. |
+| **Time Limit** | Limited evaluation window | Run Level 1 (`--dry-run`) or Level 2 (`--sample`) for complete validation within minutes. |

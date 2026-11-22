@@ -2,7 +2,6 @@
 """
 plot_cgroups_timeseries.py - Correlates kernel cgroups v2 telemetry
 (workingset_refault, pgmajfault) with p99.9 latency spikes over time.
-ACM/IEEE single-column width (3.33 inches) vector PDF.
 Supports loading real cgroups v2 telemetry traces.
 """
 
@@ -18,9 +17,9 @@ try:
 except ImportError:
     HAS_MATPLOTLIB = False
 
-COLUMN_WIDTH_INCHES = 3.33
+COLUMN_WIDTH_INCHES = 6.0
 
-def setup_academic_plot_style():
+def setup_plot_style():
     if not HAS_MATPLOTLIB:
         return
     plt.rcParams.update({
@@ -53,12 +52,10 @@ def load_cgroup_trace(trace_path: Path):
 
 def generate_timeseries(output_path: Path, trace_path: Path = None):
     if not HAS_MATPLOTLIB:
-        if output_path.exists():
-            print(f"Notice: matplotlib not installed. Preserving pre-rendered vector PDF -> {output_path}")
-            return
-        raise RuntimeError(f"matplotlib is required to render {output_path}")
-    setup_academic_plot_style()
-    fig, ax1 = plt.subplots(figsize=(COLUMN_WIDTH_INCHES, 2.4))
+        print(f"Notice: matplotlib not installed; skipping plot generation for {output_path}")
+        return
+    setup_plot_style()
+    fig, ax1 = plt.subplots(figsize=(COLUMN_WIDTH_INCHES, 3.6))
 
     time_sec, p99_latency, refaults = None, None, None
     if trace_path:
@@ -105,13 +102,12 @@ def generate_timeseries(output_path: Path, trace_path: Path = None):
     ax1.grid(True, linestyle=":", alpha=0.5)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, format="pdf", dpi=300)
+    fmt = output_path.suffix.lstrip(".").lower() or "svg"
+    fig.savefig(output_path, format=fmt, dpi=300)
     plt.close(fig)
     print(f"Rendered kernel time-series plot -> {output_path}")
 
 if __name__ == "__main__":
-    out1 = Path("Results/figures/figure_cgroups_timeseries.pdf")
-    out2 = Path("paper/figures/figure_cgroups_timeseries.pdf")
+    out1 = Path("results/figures/cgroups_timeseries.svg")
     trace = Path("reports/traces/cgroups_telemetry.json")
     generate_timeseries(out1, trace)
-    generate_timeseries(out2, trace)
