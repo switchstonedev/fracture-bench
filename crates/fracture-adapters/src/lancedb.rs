@@ -347,7 +347,11 @@ mod tests {
         // The top-2 candidate pool contains [1, 2], both of which are tombstones.
         // Bitmasking filters them out, leaving 0 active candidates returned.
         let truncated = adapter.search(&[1.0, 0.0, 0.0], 2, None).await.unwrap();
-        assert_eq!(truncated.len(), 0, "Tombstones should consume exploration budget and cause candidate truncation");
+        assert_eq!(
+            truncated.len(),
+            0,
+            "Tombstones should consume exploration budget and cause candidate truncation"
+        );
 
         // Now test with higher exploration budget: refine_factor = 2 => candidate_limit = 4
         let config_expanded = LanceDbConfig {
@@ -356,8 +360,15 @@ mod tests {
             refine_factor: Some(2),
         };
         let adapter_expanded = LanceDbAdapter::new(config_expanded);
-        let restored = adapter_expanded.search(&[1.0, 0.0, 0.0], 2, None).await.unwrap();
-        assert_eq!(restored.len(), 2, "Higher exploration budget restores retrieval of active candidates");
+        let restored = adapter_expanded
+            .search(&[1.0, 0.0, 0.0], 2, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            restored.len(),
+            2,
+            "Higher exploration budget restores retrieval of active candidates"
+        );
         assert_eq!(restored[0], 3);
         assert_eq!(restored[1], 4);
 
