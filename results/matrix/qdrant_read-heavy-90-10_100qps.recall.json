@@ -1,0 +1,8 @@
+{
+  "cutoff_lsn": 100,
+  "active_vectors_count": 100,
+  "tombstone_count": 0,
+  "evaluated_queries": 50,
+  "mean_recall_at_k": 0.172,
+  "k": 10
+}

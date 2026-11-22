@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 440" width="720" height="440">
+<style>
+  .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: bold; fill: #111; }
+  .axis-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; font-weight: bold; fill: #333; }
+  .axis { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; fill: #555; }
+  .sub-axis { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 9px; fill: #777; }
+  .grid { stroke: #e5e7eb; stroke-width: 1; stroke-dasharray: 4,4; }
+  .axis-line { stroke: #9ca3af; stroke-width: 1.2; }
+  .legend { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; fill: #333; }
+  .point { stroke-width: 1.5; stroke: #fff; }
+</style>
+<rect width="720" height="440" fill="#ffffff" />
+<text x="80" y="28" class="title">Graph Fragmentation: Point-in-Time Recall@10 vs. Tombstone Saturation (τ)</text>
+
+<!-- Horizontal Grid & Y-Axis Labels (Recall@10: 0.60 to 1.00) -->
+<line x1="80" y1="375.0" x2="670" y2="375.0" class="grid" />
+<text x="70" y="379.0" text-anchor="end" class="axis">0.60</text>
+
+<line x1="80" y1="293.75" x2="670" y2="293.75" class="grid" />
+<text x="70" y="297.75" text-anchor="end" class="axis">0.70</text>
+
+<line x1="80" y1="212.5" x2="670" y2="212.5" class="grid" />
+<text x="70" y="216.5" text-anchor="end" class="axis">0.80</text>
+
+<line x1="80" y1="131.25" x2="670" y2="131.25" class="grid" />
+<text x="70" y="135.25" text-anchor="end" class="axis">0.90</text>
+
+<line x1="80" y1="50.0" x2="670" y2="50.0" class="grid" />
+<text x="70" y="54.0" text-anchor="end" class="axis">1.00</text>
+
+<!-- Vertical Grid & X-Axis Labels (Tombstone Saturation tau) -->
+<line x1="80.0" y1="50" x2="80.0" y2="375" class="grid" />
+<text x="80.0" y="393" text-anchor="middle" class="axis">τ = 0.0</text>
+<text x="80.0" y="407" text-anchor="middle" class="sub-axis">(0 dead)</text>
+
+<line x1="198.0" y1="50" x2="198.0" y2="375" class="grid" />
+<text x="198.0" y="393" text-anchor="middle" class="axis">τ = 0.1</text>
+<text x="198.0" y="407" text-anchor="middle" class="sub-axis">(10k dead)</text>
+
+<line x1="316.0" y1="50" x2="316.0" y2="375" class="grid" />
+<text x="316.0" y="393" text-anchor="middle" class="axis">τ = 0.2</text>
+<text x="316.0" y="407" text-anchor="middle" class="sub-axis">(20k dead)</text>
+
+<line x1="434.0" y1="50" x2="434.0" y2="375" class="grid" />
+<text x="434.0" y="393" text-anchor="middle" class="axis">τ = 0.3</text>
+<text x="434.0" y="407" text-anchor="middle" class="sub-axis">(30k dead)</text>
+
+<line x1="552.0" y1="50" x2="552.0" y2="375" class="grid" />
+<text x="552.0" y="393" text-anchor="middle" class="axis">τ = 0.4</text>
+<text x="552.0" y="407" text-anchor="middle" class="sub-axis">(40k dead)</text>
+
+<line x1="670.0" y1="50" x2="670.0" y2="375" class="grid" />
+<text x="670.0" y="393" text-anchor="middle" class="axis">τ = 0.5</text>
+<text x="670.0" y="407" text-anchor="middle" class="sub-axis">(50k dead)</text>
+
+<!-- Bounding Box Axes -->
+<line x1="80" y1="375" x2="670" y2="375" class="axis-line" />
+<line x1="80" y1="50" x2="80" y2="375" class="axis-line" />
+
+<!-- 1. Qdrant (Blue #0072B2) -->
+<polyline fill="none" stroke="#0072B2" stroke-width="2.2" points="80.0,70.3 198.0,80.9 316.0,100.4 434.0,144.3 552.0,202.8 670.0,241.8" />
+<circle cx="80.0" cy="70.3" r="4.5" fill="#0072B2" class="point" />
+<circle cx="198.0" cy="80.9" r="4.5" fill="#0072B2" class="point" />
+<circle cx="316.0" cy="100.4" r="4.5" fill="#0072B2" class="point" />
+<circle cx="434.0" cy="144.3" r="4.5" fill="#0072B2" class="point" />
+<circle cx="552.0" cy="202.8" r="4.5" fill="#0072B2" class="point" />
+<circle cx="670.0" cy="241.8" r="4.5" fill="#0072B2" class="point" />
+
+<!-- 2. Milvus (Vermilion #D55E00) -->
+<polyline fill="none" stroke="#D55E00" stroke-width="2.2" points="80.0,76.0 198.0,89.8 316.0,115.0 434.0,170.3 552.0,232.0 670.0,281.6" />
+<rect x="76.0" y="72.0" width="8" height="8" fill="#D55E00" class="point" />
+<rect x="194.0" y="85.8" width="8" height="8" fill="#D55E00" class="point" />
+<rect x="312.0" y="111.0" width="8" height="8" fill="#D55E00" class="point" />
+<rect x="430.0" y="166.3" width="8" height="8" fill="#D55E00" class="point" />
+<rect x="548.0" y="228.0" width="8" height="8" fill="#D55E00" class="point" />
+<rect x="666.0" y="277.6" width="8" height="8" fill="#D55E00" class="point" />
+
+<!-- 3. LanceDB (Purple #CC79A7) -->
+<polyline fill="none" stroke="#CC79A7" stroke-width="2.2" points="80.0,81.7 198.0,92.3 316.0,119.1 434.0,163.8 552.0,214.1 670.0,267.8" />
+<polygon points="80.0,77.0 85.0,85.5 75.0,85.5" fill="#CC79A7" class="point" />
+<polygon points="198.0,87.6 203.0,96.1 193.0,96.1" fill="#CC79A7" class="point" />
+<polygon points="316.0,114.4 321.0,122.9 311.0,122.9" fill="#CC79A7" class="point" />
+<polygon points="434.0,159.1 439.0,167.6 429.0,167.6" fill="#CC79A7" class="point" />
+<polygon points="552.0,209.4 557.0,217.9 547.0,217.9" fill="#CC79A7" class="point" />
+<polygon points="670.0,263.1 675.0,271.6 665.0,271.6" fill="#CC79A7" class="point" />
+
+<!-- 4. pgvector (Green #009E73) -->
+<polyline fill="none" stroke="#009E73" stroke-width="2.2" points="80.0,89.0 198.0,103.6 316.0,135.3 434.0,195.4 552.0,269.4 670.0,327.9" />
+<polygon points="80.0,84.5 84.5,89.0 80.0,93.5 75.5,89.0" fill="#009E73" class="point" />
+<polygon points="198.0,99.1 202.5,103.6 198.0,108.1 193.5,103.6" fill="#009E73" class="point" />
+<polygon points="316.0,130.8 320.5,135.3 316.0,139.8 311.5,135.3" fill="#009E73" class="point" />
+<polygon points="434.0,190.9 438.5,195.4 434.0,199.9 429.5,195.4" fill="#009E73" class="point" />
+<polygon points="552.0,264.9 556.5,269.4 552.0,273.9 547.5,269.4" fill="#009E73" class="point" />
+<polygon points="670.0,323.4 674.5,327.9 670.0,332.4 665.5,327.9" fill="#009E73" class="point" />
+
+<!-- Axis Titles -->
+<text x="375" y="426" text-anchor="middle" class="axis-title">Tombstone Saturation Ratio (τ = Dead / Active) & Accumulated Mutations</text>
+<text transform="rotate(-90)" x="-212" y="25" text-anchor="middle" class="axis-title">Mean Recall@10 (SIMD Linear Ground Truth)</text>
+
+<!-- Legend -->
+<rect x="95" y="275" width="230" height="90" fill="#ffffff" fill-opacity="0.9" stroke="#e5e7eb" rx="4" />
+
+<line x1="105" y1="290" x2="135" y2="290" stroke="#0072B2" stroke-width="2.2" />
+<circle cx="120" cy="290" r="4" fill="#0072B2" stroke="#fff" stroke-width="1" />
+<text x="145" y="294" class="legend">Qdrant (0.975 → 0.764)</text>
+
+<line x1="105" y1="312" x2="135" y2="312" stroke="#D55E00" stroke-width="2.2" />
+<rect x="116" y="308" width="8" height="8" fill="#D55E00" stroke="#fff" stroke-width="1" />
+<text x="145" y="316" class="legend">Milvus (0.968 → 0.715)</text>
+
+<line x1="105" y1="334" x2="135" y2="334" stroke="#CC79A7" stroke-width="2.2" />
+<polygon points="120,330 124,338 116,338" fill="#CC79A7" stroke="#fff" stroke-width="1" />
+<text x="145" y="338" class="legend">LanceDB (0.961 → 0.732)</text>
+
+<line x1="105" y1="356" x2="135" y2="356" stroke="#009E73" stroke-width="2.2" />
+<polygon points="120,352 124,356 120,360 116,356" fill="#009E73" stroke="#fff" stroke-width="1" />
+<text x="145" y="360" class="legend">pgvector (0.952 → 0.658)</text>
+</svg>

@@ -1,0 +1,71 @@
+{
+  "dimension": 128,
+  "pacer_jitter_p99_us": 109.951,
+  "report": {
+    "achieved_qps": 73.6,
+    "duration_sec": 5.0,
+    "service_time_p50_us": 50331.647,
+    "service_time_p90_us": 60227.583,
+    "service_time_p999_us": 61243.391,
+    "service_time_p99_us": 60653.567,
+    "total_completed": 368,
+    "total_time_p50_us": 2126512.127,
+    "total_time_p90_us": 3844079.615,
+    "total_time_p999_us": 4269801.471,
+    "total_time_p99_us": 4265607.167,
+    "unserved_arrivals": 0
+  },
+  "target": "pgvector",
+  "target_qps": 500.0,
+  "telemetry": {
+    "final_stats": {
+      "io": {
+        "rbytes": 0,
+        "rios": 0,
+        "wbytes": 0,
+        "wios": 0
+      },
+      "memory_breakdown": {
+        "anon": 0,
+        "file_mapped": 0,
+        "slab": 0
+      },
+      "pgmajfault": 0,
+      "psi": {
+        "full_avg10": 0.0,
+        "full_total_us": 0,
+        "some_avg10": 0.0,
+        "some_total_us": 0
+      },
+      "throttled_usec": 0,
+      "workingset_refault": 0
+    },
+    "initial_stats": {
+      "io": {
+        "rbytes": 0,
+        "rios": 0,
+        "wbytes": 0,
+        "wios": 0
+      },
+      "memory_breakdown": {
+        "anon": 0,
+        "file_mapped": 0,
+        "slab": 0
+      },
+      "pgmajfault": 0,
+      "psi": {
+        "full_avg10": 0.0,
+        "full_total_us": 0,
+        "some_avg10": 0.0,
+        "some_total_us": 0
+      },
+      "throttled_usec": 0,
+      "workingset_refault": 0
+    },
+    "net_pgmajfault": 0,
+    "net_throttled_usec": 0,
+    "net_workingset_refault": 0,
+    "total_samples": 0
+  },
+  "workload": "churn-70-20-10"
+}

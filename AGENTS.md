@@ -1,21 +1,44 @@
-# Workspace Agent Directives
+---
+mode: research
+harness: personal-sidecar
+---
 
-## Bootstrap Protocol
+# Workspace Agent Directives (Research Paper Governance)
+
+## 1. Academic Research & Artifact Governance Invariants
+
+- **Single-Blind & Camera-Ready Publication Policy:** This repository targets the 53rd International Conference on Very Large Data Bases (VLDB 2027) / Proceedings of the VLDB Endowment (PVLDB Volume 20) under the Experiment, Analysis & Benchmark (EA&B) track. In accordance with `research/academic-publishing`, PVLDB EA&B operates with unblinded author attribution and canonical open-source artifact citation.
+- **Three-Tier Benchmark Reproduction Hierarchy:** In compliance with `research/academic-artifact-evaluation`:
+  - **Level 1 — Dry Run (`--dry-run` / `--tier dry_run`):** 10–30s sanity check verifying audited checksums (`sha256sums.txt`), mock execution, and rendering of all SVGs/tables without compute strain.
+  - **Level 2 — Sample / Pilot (`--sample` / `--tier sample`):** 2–5m pilot sweep at 1,000 QPS across mutation churn workloads, proving functional reproducibility within reviewer time budgets.
+  - **Level 3 — Full Benchmark (`--full` / `--tier full`):** Exhaustive multi-engine empirical evaluation replicating the complete paper experimental matrix.
+- **Standardized Metric Placeholder Policy:** Uncomputed, pending, or unreachable metrics in tables or draft manuscripts MUST format strictly as `{metric_originTech}` (e.g. `{achievedQps_milvus}`, `{recall10_pgvector}`). Arbitrary ad-hoc strings (`TODO`, `??`, `N/A`) or fabricated numeric estimations are STRICTLY FORBIDDEN.
+- **Strict Repository-Relative Path Invariant:** All scripts, tests, data loaders, documentation, configuration files, and commit histories MUST employ strictly repository-relative paths (`Path(__file__).resolve().parent`, `./...`). Hardcoding absolute host paths (such as `C:\Users\...` or host drive letters) is STRICTLY FORBIDDEN.
+- **Statistical Rigor:** All empirical comparisons MUST employ non-parametric effect sizes (Vargha-Delaney A12, Cliff's delta) and Wilson score confidence intervals rather than raw uncalibrated means (`data/empirical-se-statistics`).
+- **Downstream Artifact Synchronization:** `FractureArtifact` is the downstream immutable replication package derived from this research repository. Any structural updates to benchmarks, fixtures, or container definitions MUST be synchronized to `FractureArtifact`, keeping `FractureArtifact` completely free of agent sidecars (`.agent/`, `.agents/skills/`).
+
+---
+
+## 2. Bootstrap Protocol
 - On session initialization:
   1. Verify Git hook configuration by checking if `.git/hooks/pre-commit` exists. If missing, execute `.agent/setup.ps1` (or `.agent/setup.sh` on POSIX, or verify that `.agent/.registry` is present).
   2. Check if the local `.agents/skills/` directory contains active domain skills.
-  3. Automatically detect the application stack from repository manifest files (`pyproject.toml`, `package.json`, `go.mod`, etc.) and synchronize skills silently without pausing to ask the user for confirmation to analyze.
+  3. Automatically detect the application stack from repository manifest files (`Cargo.toml`, `pyproject.toml`, etc.) and synchronize skills silently without pausing to ask the user for confirmation to analyze.
   4. Once skills are linked, strictly enforce their constraints during all subsequent code generation and review tasks.
   5. Note: Global skills (`code-review`, `doc-sync`, `error-discipline`, `git-release`, `incident-triaging`, `intent-discipline`, `repo-wiki`, `script-optimization`, `security-auditor`, `strategic-reconnaissance`, `test-discipline`, `workspace-initializer`) are pre-loaded at the machine level (`~/.gemini/config/skills/`). Do not attempt to symlink them into `.agents/skills/`.
   6. Repository Knowledge Graph: Check for `wiki/`. When architectural decisions, design contracts, or runbooks change, maintain atomic records using the `repo-wiki` protocol (`[[wikilinks]]`, YAML frontmatter). Use `.agent/wiki.ps1 query <topic>` (or `.agent/wiki.sh`) to slice context on demand without bloating the prompt window.
 
-## General Constraints
+---
+
+## 3. General Constraints
 - The `.agent/` and `.agents/` directories (including `.agent/.registry`) are internal registry, hook, and customization storage. NEVER treat them as application source code, and NEVER allow internal registry files to trigger skills.
 - **Strict Zero-Legacy-Skills Invariant:** Antigravity IDE discovers workspace skills exclusively from `.agents/skills/` (plural). The legacy directory `.agent/skills/` (singular) is permanently DEPRECATED and PROHIBITED. Agents and scripts MUST NEVER create, link, or reference `.agent/skills/`. All active domain skills and local customizations MUST reside strictly in `.agents/skills/`.
 - Do not add or remove third-party dependencies without explicit user confirmation.
 - Keep the context window lean: do not load files into context unless actively modifying them.
 
-## Self-Upgrading Pipeline & Gated Execution
+---
+
+## 4. Self-Upgrading Pipeline & Gated Execution
 - When resolving issues, authoring fixes, or proposing pull requests, adhere strictly to the 4-stage pipeline codified in `ops/self-upgrading-pipeline`:
   1. **Context Bootstrapper:** Verify maintainer taste and conventions (local rules in `.agents/rules/maintainer-taste.md` or global cache `~/.gemini/config/repo-tastes/`).
   2. **Dual-Mode Stage 2 (Defect Remediation vs. Feature Creation):**
@@ -33,7 +56,7 @@
 
 ---
 
-## Chat Output Readability & Anti-LaTeX Invariant
+## 5. Chat Output Readability & Anti-LaTeX Invariant
 
 - **Zero-Tolerance for Broken Math Delimiters:** In conversational chat turns and assistant messages, agents MUST prioritize immediate visual clarity and plain-text markdown formatting. The Chat UI renders standard GitHub-Flavored Markdown (GFM) WITHOUT a KaTeX/MathJax engine. Unescaped LaTeX causes broken formatting, raw dollar signs, and syntax noise.
 - **Rule A (Zero Dollar Delimiters):** NEVER wrap equations, numbers, units, or variables in single (`$...$`) or double (`$$...$$`) dollar signs. Dollar signs are ONLY allowed in code blocks for shell variables (e.g. `echo $PATH`), shell prompts (`$ command`), or monetary values (`$50`).
@@ -45,16 +68,12 @@
 
 ---
 
-## Git Staging & Commit Review Protocol
+## 6. Git Staging & Commit Review Protocol
 
 - **Pre-Staging Verification Gate:** Run active linters and tests via `test-discipline` before staging any changes.
 - **Autonomous Staging & Commit Formulation:** Agents are authorized to stage modified files (`git add`) and craft structured commit messages adhering strictly to the `globals/git-release` Conventional Commits standard:
   - **Header:** `<type>(<scope>): <subject>` (maximum 72 characters, imperative mood, lowercase, no trailing period).
-  - **Multi-Line Body:** Comprehensive technical description detailing:
-    - **Motivation & Intent:** Why the modification or skill addition was made.
-    - **Key Changes:** Bullet points identifying exact files, components, or invariants modified.
-    - **Verification Evidence:** Proof of local test runs (e.g., `tests passed`).
+  - **Multi-Line Body:** Comprehensive technical description detailing Motivation & Intent, Key Changes, and Verification Evidence.
 - **Documentation & Directive Lockstep Gate (`AGENTS.md` <-> `README.md`):** Before staging any change, agents MUST verify that any modification altering directory layouts, tools, scripts, or operational workflows is reflected consistently in both `README.md` and `AGENTS.md`. Committing changes where `README.md` and `AGENTS.md` describe divergent instructions is STRICTLY FORBIDDEN.
 - **Review Gate (Not Committed Until Review):** Commits MUST NOT be executed autonomously. Always leave changes staged and present the drafted commit message and diff summary to the user for review. Execute `git commit` ONLY after explicit user review and approval.
 - **Strict Zero-Unprompted-Push Guardrail:** NEVER run `git push` without explicit user instruction.
-

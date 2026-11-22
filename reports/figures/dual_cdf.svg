@@ -15,8 +15,8 @@
 <text x="65" y="55.300000000000004" text-anchor="end" class="axis">99.00%</text>
 <line x1="75" y1="45.63" x2="670" y2="45.63" class="grid" />
 <text x="65" y="49.63" text-anchor="end" class="axis">99.90%</text>
-<polyline fill="none" stroke="#1f77b4" stroke-width="2.5" points="494.3,360.0 616.6,108.0 669.4,51.3 669.4,45.6" />
-<polyline fill="none" stroke="#d62728" stroke-width="2.5" stroke-dasharray="5,4" points="505.5,360.0 617.5,108.0 670.0,51.3 670.0,45.6" />
+<polyline fill="none" stroke="#1f77b4" stroke-width="2.5" points="460.9,360.0 535.0,108.0 572.8,51.3 572.8,45.6" />
+<polyline fill="none" stroke="#d62728" stroke-width="2.5" stroke-dasharray="5,4" points="663.8,360.0 666.3,108.0 670.0,51.3 670.0,45.6" />
 <text x="372.5" y="405" text-anchor="middle" class="axis">Latency (µs, Log Scale)</text>
 <line x1="95" y1="65" x2="125" y2="65" stroke="#1f77b4" stroke-width="2.5" />
 <text x="130" y="69" class="legend">Service Time (Socket RTT)</text>

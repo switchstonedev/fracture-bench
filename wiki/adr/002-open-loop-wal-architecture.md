@@ -4,7 +4,7 @@ summary: Architectural decision establishing quanta-based TSC pacing, cross-CCD 
 type: adr
 status: active
 tags: [adr, pacer, tsc, wal, ground-truth, linearizability]
-aliases: [adr-002, open-loop-wal]
+aliases: [adr-002, open-loop-wal, open-loop-wal-protocol]
 ---
 
 # ADR 002: Open-Loop Hardware Pacing & Binary WAL Architecture

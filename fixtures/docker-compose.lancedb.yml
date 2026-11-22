@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  lancedb:
+    image: lancedb/lancedb:v0.13.0
+    container_name: fracture_lancedb
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - LANCEDB_PORT=8080
+      - LANCEDB_DATA_DIR=/data/lancedb
+    volumes:
+      - lancedb_data:/data/lancedb
+    deploy:
+      resources:
+        limits:
+          cpus: '4.00'
+          memory: 8192M
+        reservations:
+          cpus: '4.00'
+          memory: 7168M
+
+volumes:
+  lancedb_data:

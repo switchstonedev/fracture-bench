@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   qdrant:
-    image: qdrant/qdrant:v1.8.0
+    image: qdrant/qdrant:v1.12.1
     container_name: fracture_qdrant
     restart: unless-stopped
     ports:

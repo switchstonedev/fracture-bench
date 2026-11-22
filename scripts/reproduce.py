@@ -49,6 +49,17 @@ def verify_sha256_manifest(workspace_root: Path, manifest_file: Path) -> Verific
         expected_hash, rel_path_str = parts[0], parts[1].strip()
         target_path = workspace_root / rel_path_str
         if not target_path.is_file():
+            # Check casing fallback (e.g. scripts/ vs Scripts/)
+            if rel_path_str.startswith("scripts/"):
+                alt = workspace_root / ("Scripts" + rel_path_str[len("scripts"):])
+                if alt.is_file():
+                    target_path = alt
+            elif rel_path_str.startswith("Scripts/"):
+                alt = workspace_root / ("scripts" + rel_path_str[len("Scripts"):])
+                if alt.is_file():
+                    target_path = alt
+
+        if not target_path.is_file():
             missing.append(rel_path_str)
             continue
 

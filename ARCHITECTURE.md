@@ -165,10 +165,10 @@ We define the tightest sound candidate bounds:
 
 ### 7.3 Write-Acknowledgment Normalization
 To prevent client consistency settings from confounding engine resilience metrics, Fracture normalizes write visibility across targets:
-* **Qdrant (v1.9+):** `wait=true` (synchronous write ACK ensuring segment memory visibility).
-* **Milvus (v2.4+):** Consistency level configured to `Bounded` (5-second staleness bound) and validated under `Strong`.
-* **pgvector (v0.8+):** `synchronous_commit = on` (transaction WAL persistence).
-* **LanceDB (v0.6+):** Explicit transaction fragment commit ACK.
+* **Qdrant (v1.12+):** `wait=true` (synchronous write ACK ensuring segment memory visibility).
+* **Milvus (v2.4 LTS+):** Consistency level configured to `Bounded` (5-second staleness bound) and validated under `Strong`.
+* **pgvector (v0.8+ / PG16):** `synchronous_commit = on` (transaction WAL persistence).
+* **LanceDB (v0.13+):** Explicit transaction fragment commit ACK.
 
 ---
 

@@ -24,7 +24,7 @@ services:
     command: minio server /minio_data
 
   standalone:
-    image: milvusdb/milvus:v2.3.4
+    image: milvusdb/milvus:v2.4.21
     container_name: fracture_milvus
     command: ["milvus", "run", "standalone"]
     environment:

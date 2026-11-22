@@ -1,0 +1,28 @@
+{
+  "dimension": 128,
+  "dry_run": true,
+  "pacer_jitter_p99_us": 0.0,
+  "report": {
+    "achieved_qps": 0.0,
+    "duration_sec": 0.0,
+    "service_time_p50_us": 0.0,
+    "service_time_p90_us": 0.0,
+    "service_time_p999_us": 0.0,
+    "service_time_p99_us": 0.0,
+    "total_completed": 0,
+    "total_time_p50_us": 0.0,
+    "total_time_p90_us": 0.0,
+    "total_time_p999_us": 0.0,
+    "total_time_p99_us": 0.0,
+    "unserved_arrivals": 0
+  },
+  "target": "milvus",
+  "target_qps": 1000.0,
+  "telemetry": {
+    "net_pgmajfault": 0,
+    "net_throttled_usec": 0,
+    "net_workingset_refault": 0,
+    "total_samples": 0
+  },
+  "workload": "write-heavy-50-50"
+}

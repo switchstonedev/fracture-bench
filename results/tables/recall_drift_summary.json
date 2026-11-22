@@ -1,0 +1,32 @@
+[
+  {
+    "cutoff_lsn": 60,
+    "active_vectors": 60,
+    "tombstone_count": 0,
+    "mean_recall_at_10": 1.0
+  },
+  {
+    "cutoff_lsn": 120,
+    "active_vectors": 120,
+    "tombstone_count": 0,
+    "mean_recall_at_10": 1.0
+  },
+  {
+    "cutoff_lsn": 180,
+    "active_vectors": 180,
+    "tombstone_count": 0,
+    "mean_recall_at_10": 1.0
+  },
+  {
+    "cutoff_lsn": 240,
+    "active_vectors": 200,
+    "tombstone_count": 0,
+    "mean_recall_at_10": 1.0
+  },
+  {
+    "cutoff_lsn": 300,
+    "active_vectors": 200,
+    "tombstone_count": 0,
+    "mean_recall_at_10": 1.0
+  }
+]

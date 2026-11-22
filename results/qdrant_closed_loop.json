@@ -1,0 +1,71 @@
+{
+  "dimension": 128,
+  "pacer_jitter_p99_us": 0.0,
+  "report": {
+    "achieved_qps": 904.6666666666666,
+    "duration_sec": 3.0,
+    "service_time_p50_us": 905.727,
+    "service_time_p90_us": 14262.271,
+    "service_time_p999_us": 30130.175,
+    "service_time_p99_us": 18481.151,
+    "total_completed": 2714,
+    "total_time_p50_us": 905.727,
+    "total_time_p90_us": 14262.271,
+    "total_time_p999_us": 30130.175,
+    "total_time_p99_us": 18481.151,
+    "unserved_arrivals": 0
+  },
+  "target": "qdrant",
+  "target_qps": 5000.0,
+  "telemetry": {
+    "final_stats": {
+      "io": {
+        "rbytes": 0,
+        "rios": 0,
+        "wbytes": 0,
+        "wios": 0
+      },
+      "memory_breakdown": {
+        "anon": 0,
+        "file_mapped": 0,
+        "slab": 0
+      },
+      "pgmajfault": 0,
+      "psi": {
+        "full_avg10": 0.0,
+        "full_total_us": 0,
+        "some_avg10": 0.0,
+        "some_total_us": 0
+      },
+      "throttled_usec": 0,
+      "workingset_refault": 0
+    },
+    "initial_stats": {
+      "io": {
+        "rbytes": 0,
+        "rios": 0,
+        "wbytes": 0,
+        "wios": 0
+      },
+      "memory_breakdown": {
+        "anon": 0,
+        "file_mapped": 0,
+        "slab": 0
+      },
+      "pgmajfault": 0,
+      "psi": {
+        "full_avg10": 0.0,
+        "full_total_us": 0,
+        "some_avg10": 0.0,
+        "some_total_us": 0
+      },
+      "throttled_usec": 0,
+      "workingset_refault": 0
+    },
+    "net_pgmajfault": 0,
+    "net_throttled_usec": 0,
+    "net_workingset_refault": 0,
+    "total_samples": 0
+  },
+  "workload": "churn-70-20-10"
+}

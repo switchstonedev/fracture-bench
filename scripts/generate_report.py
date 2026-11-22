@@ -235,9 +235,6 @@ def generate_markdown_table(cells: List[Dict[str, Any]], output_path: Path):
         lines.append("| " + " | ".join(row) + " |")
 
     lines.append("")
-    lines.append("> [!NOTE]")
-    lines.append("> Standardized uncomputed metric placeholders format strictly as `{metric_originTech}` in compliance with academic reproducibility protocols.")
-    lines.append("")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
@@ -308,8 +305,15 @@ def main():
     args = parser.parse_args()
 
     workspace_root = Path(__file__).resolve().parent.parent
-    out_dir = (workspace_root / args.output_dir).resolve()
-    fig_dir = out_dir / "figures"
+    raw_out = Path(args.output_dir)
+    if raw_out.suffix.lower() == ".svg":
+        target_svg = (workspace_root / raw_out).resolve()
+        fig_dir = target_svg.parent
+        out_dir = fig_dir.parent
+    else:
+        out_dir = (workspace_root / raw_out).resolve()
+        fig_dir = out_dir / "figures"
+        target_svg = fig_dir / "dual_cdf.svg"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Dual-CDF Generation
@@ -343,7 +347,7 @@ def main():
         except Exception:
             pass
 
-    generate_svg_dual_cdf(service_percentiles, total_percentiles, fig_dir / "dual_cdf.svg")
+    generate_svg_dual_cdf(service_percentiles, total_percentiles, target_svg)
 
     # 2. Matrix Processing
     matrix_file = (workspace_root / args.input_matrix).resolve()
