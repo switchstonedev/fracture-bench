@@ -39,13 +39,13 @@ To accommodate reviewer time constraints, Fracture exposes a deterministic three
 
 ### Step 1: Clone and Inspect
 ```bash
-git clone https://github.com/Awesome06/paper6.git
-cd paper6
+git clone https://github.com/switchstonedev/fracture-bench.git
+cd fracture-bench
 ```
 
 ### Step 2: Level 1 Dry-Run Verification (< 30 seconds)
 ```bash
-python Scripts/reproduce.py --tier dry_run
+python scripts/reproduce.py --tier dry_run
 # or alternatively via Makefile:
 make bench-dry
 ```

@@ -17,7 +17,7 @@ Fracture serves as an adversarial, vendor-neutral referee for vector databases. 
 
 ### A. Qdrant
 * **Engine Type:** Dedicated Vector Database (Rust)
-* **Version:** `qdrant/qdrant:v1.8.0`
+* **Version:** `qdrant/qdrant:v1.12.1`
 * **Network Protocol:** HTTP / REST on port 6333, gRPC on port 6334
 * **Vector Schema:**
   - Collection: `fracture_bench`
@@ -39,7 +39,7 @@ Fracture serves as an adversarial, vendor-neutral referee for vector databases. 
 
 ### B. pgvector (PostgreSQL 16)
 * **Engine Type:** Relational ACID Database Extension (C / PostgreSQL)
-* **Version:** `pgvector/pgvector:pg16`
+* **Version:** `pgvector/pgvector:0.8.0-pg16`
 * **Network Protocol:** PostgreSQL wire protocol on port 5433 (remapped from 5432 to avoid host SCRAM conflicts)
 * **Authentication:** `POSTGRES_HOST_AUTH_METHOD=trust`
 * **Vector Schema:**
@@ -68,7 +68,7 @@ Fracture serves as an adversarial, vendor-neutral referee for vector databases. 
 
 ### C. Milvus
 * **Engine Type:** Distributed Cloud-Native Vector Database (Go / C++ Knowhere)
-* **Version:** `milvusdb/milvus:v2.3.4` (Standalone)
+* **Version:** `milvusdb/milvus:v2.4.21` (Standalone)
 * **Network Protocol:** HTTP / gRPC on port 19530
 * **Architecture:**
   - Milvus Coordinator & QueryNode
@@ -91,7 +91,7 @@ Fracture serves as an adversarial, vendor-neutral referee for vector databases. 
 
 ### D. LanceDB
 * **Engine Type:** Embedded Columnar Vector Engine (Rust / Apache Arrow)
-* **Version:** `lancedb` (embedded)
+* **Version:** `lancedb:v0.13.0` (embedded / `lancedb/lancedb:v0.13.0`)
 * **Storage Format:** Apache Arrow columnar tables stored in local NVMe / filesystem directory
 * **Execution Boundary:** In-process embedded execution, eliminating client-server IPC overhead.
 * **Index Configuration:**
