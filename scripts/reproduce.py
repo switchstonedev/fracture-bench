@@ -8,10 +8,9 @@ Execution Hierarchy:
   - Level 3: Full    (--tier full    / --full):    Exhaustive matrix sweep across all engines
 
 Outputs:
-  - reports/benchmark_summary.md
-  - reports/benchmark_summary.tex
-  - reports/figures/dual_cdf.svg
-  - reports/figures/pareto_frontier.svg
+  - results/benchmark_summary.md
+  - results/figures/dual_cdf.svg
+  - results/figures/pareto_frontier.svg
 """
 
 import argparse
@@ -52,7 +51,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="reports",
+        default="results",
         help="Output directory for generated benchmark artifacts",
     )
     parser.add_argument(
@@ -128,7 +127,6 @@ def main():
     out_dir = workspace_root / args.output_dir
     expected_artifacts = [
         out_dir / "benchmark_summary.md",
-        out_dir / "benchmark_summary.tex",
         out_dir / "figures" / "dual_cdf.svg",
         out_dir / "figures" / "pareto_frontier.svg",
         out_dir / "figures" / "recall_drift.svg",

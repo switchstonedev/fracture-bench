@@ -32,4 +32,3 @@ Benchmarking engineers and operators evaluating vector database performance oper
 ## References
 - System Architecture: [[wiki/architecture]] (relates_to)
 - WAL Replay: [[wiki/adr/002-open-loop-wal-architecture]] (relates_to)
-- Repository Conventions: [[wiki/repo-tastes/switchstonedev-fracture-bench]] (relates_to)

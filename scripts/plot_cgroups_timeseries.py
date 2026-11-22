@@ -109,5 +109,5 @@ def generate_timeseries(output_path: Path, trace_path: Path = None):
 
 if __name__ == "__main__":
     out1 = Path("results/figures/cgroups_timeseries.svg")
-    trace = Path("reports/traces/cgroups_telemetry.json")
+    trace = Path("results/traces/cgroups_telemetry.json")
     generate_timeseries(out1, trace)

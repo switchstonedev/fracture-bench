@@ -1,6 +1,6 @@
 # Canonical Vector Datasets & Stratified Modulo Partitions
 
-This directory specifies the datasets and partition contracts used to evaluate target vector databases under \textsc{Fracture}.
+This directory specifies the datasets and partition contracts used to evaluate target vector databases under Fracture.
 
 ---
 
@@ -8,7 +8,7 @@ This directory specifies the datasets and partition contracts used to evaluate t
 
 | Dataset | Dimensionality | Distance Metric | Base Vector Count | Raw Vector Footprint (f32) | Estimated Graph Size (M=16) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **SIFT-1M** | 128 dimensions | Euclidean ($L_2$) | 1,000,000 | ~512 MB | ~1.5 GB |
+| **SIFT-1M** | 128 dimensions | Euclidean (L2) | 1,000,000 | ~512 MB | ~1.5 GB |
 | **Cohere-1M** | 768 dimensions | Cosine / Dot Product | 1,000,000 | ~3.07 GB | ~5.5 GB |
 
 ---
@@ -39,5 +39,13 @@ To prevent synthetic evaluation bias in filtered retrieval, queries are partitio
 
 ## 3. Ground Truth Verification Invariant
 
-Exact $k$-NN ground truth is not evaluated against static embeddings. For each query, the observed committed Log Sequence Number (LSN) from the Write-Ahead Log is extracted, and brute-force SIMD linear scans are executed post-hoc across active vectors committed prior to that LSN cutoff.
+Exact k-NN ground truth is not evaluated against static embeddings. For each query, the observed committed Log Sequence Number (LSN) from the Write-Ahead Log is extracted, and brute-force SIMD linear scans are executed post-hoc across active vectors committed prior to that LSN cutoff.
+
+---
+
+## 4. Test Fixtures & Benchmark Acquisition
+
+- **Unit & Pilot Fixtures:** A self-contained 100-vector SIFT test fixture is located at `fixtures/sample_sift128.fvecs` (100 vectors, 128 dimensions, f32). This is used by `cargo test` and dry-run/sample reproduction tiers without downloading external datasets.
+- **Full Corpus Benchmark (SIFT-1M / Cohere-1M):** For full-tier benchmark sweeps (`--tier full`), place the full extracted `.fvecs` or `.bvecs` corpus files into `datasets/` (automatically gitignored).
+
 

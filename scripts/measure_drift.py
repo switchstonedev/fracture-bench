@@ -4,8 +4,8 @@ measure_drift.py - Quantify Graph Degradation & Recall Drift over Mutation Progr
 Replays binary WAL at sequential LSN boundaries to measure how dead node tombstones
 and HNSW graph fragmentation erode Recall@K over time.
 Outputs:
-  - reports/figures/recall_drift.svg
-  - reports/recall_drift_summary.json
+  - results/figures/recall_drift.svg
+  - results/recall_drift_summary.json
 """
 
 import argparse
@@ -116,7 +116,7 @@ def main():
     parser.add_argument("--target", type=str, default="mock", help="Target adapter to verify against WAL")
     parser.add_argument("--endpoint", type=str, default=None, help="Optional endpoint for target database")
     parser.add_argument("--checkpoints", type=int, default=5, help="Number of LSN checkpoints to sample")
-    parser.add_argument("--output-dir", type=str, default="reports", help="Output directory")
+    parser.add_argument("--output-dir", type=str, default="results", help="Output directory")
     args = parser.parse_args()
 
     workspace_root = Path(__file__).resolve().parent.parent

@@ -69,7 +69,7 @@ python "$scriptsDir/plot_cgroups_timeseries.py"
 if ($benchTier -eq "full") {
     # 3. Compute non-parametric bootstrap confidence intervals
     Write-Host "[Step 3/4] Evaluating 95% bootstrap confidence bounds..." -ForegroundColor Yellow
-    python Analysis/bootstrap_ci.py
+    python "$scriptsDir/bootstrap_ci.py"
 }
 
 # 4. Final verification of generated deliverables

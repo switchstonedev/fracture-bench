@@ -79,7 +79,7 @@ python3 "${SCRIPTS_DIR}/plot_cgroups_timeseries.py"
 if [ "${BENCH_TIER}" == "full" ]; then
     # 3. Compute non-parametric bootstrap confidence intervals
     echo "[Step 3/4] Evaluating 95% bootstrap confidence bounds..."
-    python3 Analysis/bootstrap_ci.py
+    python3 "${SCRIPTS_DIR}/bootstrap_ci.py"
 fi
 
 # 4. Final verification of generated deliverables

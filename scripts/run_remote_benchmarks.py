@@ -47,7 +47,7 @@ def wait_for_services(ports: dict, timeout_sec: int = 45):
 def main():
     parser = argparse.ArgumentParser(description="Fracture Remote Benchmark Automation Driver")
     parser.add_argument("--tier", type=str, default="sample", choices=["dry_run", "sample", "full"])
-    parser.add_argument("--output-dir", type=str, default="reports")
+    parser.add_argument("--output-dir", type=str, default="results")
     parser.add_argument("--skip-docker", action="store_true", help="Skip starting Docker containers")
     args = parser.parse_args()
 

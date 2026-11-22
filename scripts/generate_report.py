@@ -3,9 +3,9 @@
 generate_report.py - Visual artifact and trace report generator.
 Produces SVG/HTML Dual-CDF curves, Pareto frontiers, and cgroups v2 time-series.
 Outputs:
-  - reports/figures/dual_cdf.svg
-  - reports/figures/pareto_frontier.svg
-  - reports/benchmark_summary.md (GFM markdown table adhering to Anti-LaTeX plain-text invariant)
+  - results/figures/dual_cdf.svg
+  - results/figures/pareto_frontier.svg
+  - results/benchmark_summary.md (GFM markdown table adhering to Anti-LaTeX plain-text invariant)
 
 Standardized placeholder policy:
 Any unexecuted or unreachable metric is formatted strictly as:
@@ -253,7 +253,7 @@ def main():
         "--output-dir",
         "-o",
         type=str,
-        default="reports",
+        default="results",
         help="Directory to store figures and tabular summaries",
     )
     args = parser.parse_args()

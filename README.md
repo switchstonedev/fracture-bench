@@ -107,23 +107,23 @@ fracture-bench/
 │   ├── plot_filtering_pathology.py    # Generates Modulo selectivity pathology plot
 │   ├── plot_cgroups_timeseries.py     # Generates Kernel refault vs latency plot
 │   ├── generate_report.py             # SVG Dual-CDF report renderer
+│   ├── bootstrap_ci.py                # Non-parametric bootstrap confidence interval estimator
 │   ├── run_remote_benchmarks.py       # Bare-metal remote benchmark driver
 │   ├── run_remote_benchmarks.sh       # Remote benchmark invocation script
 │   └── setup_host.sh                  # Host CPU shielding & cgroups v2 configuration
-├── Datasets/                          # Dataset schemas & modulo filter cohorts
+├── datasets/                          # Dataset schemas & modulo filter cohorts
 │   └── README.md                      # SIFT-1M and Cohere-1M specifications
-├── Results/                           # Benchmark traces and rendered deliverables
-│   ├── traces/                        # Raw JSON execution logs & binary WAL files
+├── results/                           # Benchmark traces and rendered deliverables
+│   ├── figures/                       # Rendered benchmark vector SVGs
 │   ├── matrix/                        # Engine execution matrices (Qdrant, pgvector, LanceDB, mock)
 │   ├── drift/                         # LSN checkpoint drift traces
-│   ├── figures/                       # Rendered benchmark vector SVGs
-│   └── tables/                        # Exported Markdown summary tables
-├── Analysis/                          # Statistical evaluation
-│   └── bootstrap_ci.py                # 95% non-parametric bootstrap confidence intervals
+│   ├── traces/                        # Raw JSON execution logs & binary WAL files
+│   ├── recall_drift_summary.json      # Point-in-time recall degradation summary
+│   └── benchmark_summary.md           # Primary GFM summary table
 ├── wiki/                              # Repository Knowledge Graph & ADRs
 │   ├── index.md                       # Knowledge graph entrypoint
 │   ├── architecture.md                # System & empirical architecture
-│   └── adr/                           # Architecture Decision Records (ADRs 001-004)
+│   └── adr/                           # Architecture Decision Records (ADRs 001-005)
 ├── Cargo.toml                         # Rust workspace configuration
 ├── Cargo.lock                         # Pinned dependency lockfile
 ├── Makefile                           # Unified developer build & test targets
@@ -193,7 +193,7 @@ python3 scripts/plot_filtering_pathology.py
 python3 scripts/plot_cgroups_timeseries.py
 
 # Calculate 95% Bootstrap Confidence Intervals
-python3 Analysis/bootstrap_ci.py
+python3 scripts/bootstrap_ci.py
 ```
 
 ---
@@ -212,3 +212,4 @@ The repository maintains atomic architectural decision records (ADRs) and domain
 * **[[wiki/adr/002-open-loop-wal-architecture]]:** Decoupled hardware TSC pacing, quanta calibration, and cache-line aligned binary WAL.
 * **[[wiki/adr/003-three-tier-evaluation-and-reproduction]]:** Three-tier execution hierarchy (dry-run, sample, full) and deterministic placeholder discipline.
 * **[[wiki/adr/004-fracture-rebranding-and-switchstone-import]]:** Transition to Fracture benchmark namespace and SwitchStone organization integration.
+* **[[wiki/adr/005-author-oss-benchmark-governance]]:** Author-OSS benchmark suite governance, GFM web deliverables, and directory consolidation.

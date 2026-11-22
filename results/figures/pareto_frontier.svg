@@ -23,45 +23,23 @@
 <line x1="75" y1="360.0" x2="670" y2="360.0" class="grid" />
 <text x="65" y="364.0" text-anchor="end" class="axis">0</text>
 <line x1="75" y1="281.25" x2="670" y2="281.25" class="grid" />
-<text x="65" y="285.25" text-anchor="end" class="axis">1562</text>
+<text x="65" y="285.25" text-anchor="end" class="axis">25</text>
 <line x1="75" y1="202.5" x2="670" y2="202.5" class="grid" />
-<text x="65" y="206.5" text-anchor="end" class="axis">3125</text>
+<text x="65" y="206.5" text-anchor="end" class="axis">50</text>
 <line x1="75" y1="123.75" x2="670" y2="123.75" class="grid" />
-<text x="65" y="127.75" text-anchor="end" class="axis">4687</text>
+<text x="65" y="127.75" text-anchor="end" class="axis">75</text>
 <line x1="75" y1="45.0" x2="670" y2="45.0" class="grid" />
-<text x="65" y="49.0" text-anchor="end" class="axis">6250</text>
-<circle cx="654.5" cy="108.5" r="5.5" fill="#1f77b4" class="point" />
-<text x="662.5" y="112.5" font-family="sans-serif" font-size="9" fill="#333">qdrant (read)</text>
-<circle cx="617.6" cy="112.0" r="5.5" fill="#1f77b4" class="point" />
-<text x="625.6" y="116.0" font-family="sans-serif" font-size="9" fill="#333">qdrant (churn)</text>
-<circle cx="589.1" cy="124.1" r="5.5" fill="#1f77b4" class="point" />
-<text x="597.1" y="128.1" font-family="sans-serif" font-size="9" fill="#333">qdrant (write)</text>
-<circle cx="651.0" cy="109.0" r="5.5" fill="#9467bd" class="point" />
-<text x="659.0" y="113.0" font-family="sans-serif" font-size="9" fill="#333">milvus (read)</text>
-<circle cx="607.5" cy="113.5" r="5.5" fill="#9467bd" class="point" />
-<text x="615.5" y="117.5" font-family="sans-serif" font-size="9" fill="#333">milvus (churn)</text>
-<circle cx="576.0" cy="131.2" r="5.5" fill="#9467bd" class="point" />
-<text x="584.0" y="135.2" font-family="sans-serif" font-size="9" fill="#333">milvus (write)</text>
-<circle cx="641.4" cy="127.2" r="5.5" fill="#ff7f0e" class="point" />
-<text x="649.4" y="131.2" font-family="sans-serif" font-size="9" fill="#333">pgvector (read)</text>
-<circle cx="593.2" cy="147.8" r="5.5" fill="#ff7f0e" class="point" />
-<text x="601.2" y="151.8" font-family="sans-serif" font-size="9" fill="#333">pgvector (churn)</text>
-<circle cx="559.9" cy="167.5" r="5.5" fill="#ff7f0e" class="point" />
-<text x="567.9" y="171.5" font-family="sans-serif" font-size="9" fill="#333">pgvector (write)</text>
-<circle cx="646.8" cy="108.0" r="5.5" fill="#d62728" class="point" />
-<text x="654.8" y="112.0" font-family="sans-serif" font-size="9" fill="#333">lancedb (read)</text>
-<circle cx="611.7" cy="110.5" r="5.5" fill="#d62728" class="point" />
-<text x="619.7" y="114.5" font-family="sans-serif" font-size="9" fill="#333">lancedb (churn)</text>
-<circle cx="580.8" cy="122.1" r="5.5" fill="#d62728" class="point" />
-<text x="588.8" y="126.1" font-family="sans-serif" font-size="9" fill="#333">lancedb (write)</text>
+<text x="65" y="49.0" text-anchor="end" class="axis">100</text>
 <text x="372.5" y="405" text-anchor="middle" class="axis">Mean Recall@10 (Ground-Truth Correctness)</text>
 <text transform="rotate(-90)" x="-202.5" y="20" text-anchor="middle" class="axis">Achieved Throughput (QPS)</text>
 <rect x="95" y="57" width="10" height="10" fill="#d62728" />
-<text x="111" y="65" class="legend">lancedb (measured)</text>
+<text x="111" y="65" class="legend">lancedb (pending: {qps_lancedb})</text>
 <rect x="95" y="73" width="10" height="10" fill="#9467bd" />
-<text x="111" y="81" class="legend">milvus (measured)</text>
-<rect x="95" y="89" width="10" height="10" fill="#ff7f0e" />
-<text x="111" y="97" class="legend">pgvector (measured)</text>
-<rect x="95" y="105" width="10" height="10" fill="#1f77b4" />
-<text x="111" y="113" class="legend">qdrant (measured)</text>
+<text x="111" y="81" class="legend">milvus (pending: {qps_milvus})</text>
+<rect x="95" y="89" width="10" height="10" fill="#2ca02c" />
+<text x="111" y="97" class="legend">mock (pending: {qps_mock})</text>
+<rect x="95" y="105" width="10" height="10" fill="#ff7f0e" />
+<text x="111" y="113" class="legend">pgvector (pending: {qps_pgvector})</text>
+<rect x="95" y="121" width="10" height="10" fill="#1f77b4" />
+<text x="111" y="129" class="legend">qdrant (pending: {qps_qdrant})</text>
 </svg>

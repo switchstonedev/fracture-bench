@@ -47,6 +47,7 @@ wiki-graph.mermaid
 DEMO_VIDEO_SCRIPT.md
 demo-recording/
 scratch/
+personal/
 
 # Local secrets & credentials
 secrets/
@@ -63,16 +64,22 @@ data/
 
 # Local agent rules & maintainer taste
 .agents/rules/
+wiki/repo-tastes/
+repo-tastes/
+
+# Large downloaded dataset files
+datasets/*.fvecs
+datasets/*.bvecs
+datasets/*.tar.gz
+datasets/*.parquet
+datasets/*.h5
+!datasets/README.md
 
 # Dynamic benchmark execution traces
-reports/matrix/
 runs/
 *.wal
 !results/traces/.gitkeep
-!Results/traces/.gitkeep
 !results/traces/sample_*.wal
-!Results/traces/sample_*.wal
 results/traces/benchmark.json
-Results/traces/benchmark.json
 
 

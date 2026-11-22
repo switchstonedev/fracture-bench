@@ -12,7 +12,7 @@ WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${WORKSPACE_ROOT}"
 
 TIER="${1:-full}" # Choices: dry_run, sample, full
-OUTPUT_DIR="${WORKSPACE_ROOT}/reports"
+OUTPUT_DIR="${WORKSPACE_ROOT}/results"
 TRACE_DIR="${OUTPUT_DIR}/traces"
 MATRIX_DIR="${OUTPUT_DIR}/matrix"
 

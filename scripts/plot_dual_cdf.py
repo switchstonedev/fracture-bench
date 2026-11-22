@@ -109,5 +109,5 @@ def generate_dual_cdf(output_path: Path, trace_path: Path = None):
 
 if __name__ == "__main__":
     out1 = Path("results/figures/dual_cdf.svg")
-    trace = Path("reports/traces/dual_cdf.json")
+    trace = Path("results/traces/dual_cdf.json")
     generate_dual_cdf(out1, trace)

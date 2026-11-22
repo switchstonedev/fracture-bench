@@ -52,8 +52,8 @@ make bench-dry
 This performs:
 1. Rust binary compilation check.
 2. Dry-run execution of workload matrix.
-3. Rendering of benchmark SVGs (`reports/figures/dual_cdf.svg`, `reports/figures/pareto_frontier.svg`, `reports/figures/recall_drift.svg`).
-4. Generation of summary tables (`reports/benchmark_summary.md`, `reports/benchmark_summary.tex`).
+3. Rendering of benchmark SVGs (`results/figures/dual_cdf.svg`, `results/figures/pareto_frontier.svg`, `results/figures/recall_drift.svg`).
+4. Generation of summary tables (`results/benchmark_summary.md`).
 
 ### Step 3: Level 2 Sample Pilot Run (2–5 minutes)
 ```bash

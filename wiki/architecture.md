@@ -51,12 +51,20 @@ flowchart TD
 ```
 
 ## 2. Subsystem Layout
-*   `crates/fracture-pacer`: High-precision arrival scheduler running on an isolated, pinned CPU core (CCD 0 / Core 1).
-*   `crates/fracture-core`: Domain types, 64-byte cache-line aligned binary Write-Ahead Log (WAL), contiguous `VectorArena` with 64-bit visibility bitset skipping, and dual-bound linearizability top-K verification.
-*   `crates/fracture-telemetry`: Allocation-free Linux `/sys/fs/cgroup` parser sampling memory refaults, PSI stalls, and CFS throttling.
+*   `crates/fracture-pacer`: High-precision arrival scheduler running on an isolated, pinned CPU core (CCD 0 / Core 1). See [[wiki/concepts/hardware-pacing]].
+*   `crates/fracture-core`: Domain types, 64-byte cache-line aligned binary Write-Ahead Log (WAL), contiguous `VectorArena` with 64-bit visibility bitset skipping, and dual-bound linearizability top-K verification. See [[wiki/concepts/simd-linear-scan-arenas]].
+*   `crates/fracture-telemetry`: Allocation-free Linux `/sys/fs/cgroup` parser sampling memory refaults, PSI stalls, and CFS throttling. See [[wiki/concepts/zero-allocation-telemetry]].
 *   `crates/fracture-adapters`: Unified database client trait implementations across Qdrant, Milvus, pgvector, and LanceDB.
 *   `crates/fracture-cli`: Main executable binary with `run`, `verify`, and `profile` subcommands.
 
-## 3. Architecture Decision Records
-*   Initial Baseline: [[wiki/adr/001-initial-architecture]]
-*   Open-Loop WAL Architecture: [[wiki/adr/002-open-loop-wal-architecture]]
+## 3. Systems Engineering Concepts
+*   Hardware Pacing & TSC Calibration: [[wiki/concepts/hardware-pacing]] (relates_to)
+*   Zero-Allocation Cgroups v2 Telemetry: [[wiki/concepts/zero-allocation-telemetry]] (relates_to)
+*   SIMD Linear Scan Arenas & Dual-Bound Linearizability: [[wiki/concepts/simd-linear-scan-arenas]] (relates_to)
+
+## 4. Architecture Decision Records
+*   Initial Baseline: [[wiki/adr/001-initial-architecture]] (relates_to)
+*   Open-Loop WAL Architecture: [[wiki/adr/002-open-loop-wal-architecture]] (relates_to)
+*   Three-Tier Benchmark Evaluation: [[wiki/adr/003-three-tier-evaluation-and-reproduction]] (relates_to)
+*   Fracture Rebranding & SwitchStone Migration: [[wiki/adr/004-fracture-rebranding-and-switchstone-import]] (relates_to)
+*   Author-OSS Benchmark Governance: [[wiki/adr/005-author-oss-benchmark-governance]] (relates_to)
